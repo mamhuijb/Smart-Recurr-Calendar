@@ -4,6 +4,8 @@ import { AppSettings, Customer, Service, Technician, RecurrenceEvent } from '../
 import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone } from 'lucide-react';
 import { startOAuthFlow } from '../services/authService';
 import { SecureStorage } from '../utils/secureStorage';
+import { QRCodeSVG } from 'qrcode.react';
+import { generateSecret, generateTotpUri } from '../utils/authSecurity';
 
 interface AdminPanelProps {
   settings: AppSettings;
@@ -324,7 +326,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 type="checkbox" 
                                 className="sr-only peer"
                                 checked={localSettings.security.twoFactorEnabled}
-                                onChange={(e) => setLocalSettings(prev => ({...prev, security: {...prev.security, twoFactorEnabled: e.target.checked}}))}
+                                onChange={(e) => {
+                                    const isEnabled = e.target.checked;
+                                    let currentSecret = localSettings.security.twoFactorSecret;
+                                    
+                                    // Generate new secret if enabling and (no secret exists OR it's the mock default)
+                                    if (isEnabled && (!currentSecret || currentSecret === 'JBSWY3DPEHPK3PXP')) {
+                                        currentSecret = generateSecret();
+                                    }
+
+                                    setLocalSettings(prev => ({
+                                        ...prev, 
+                                        security: {
+                                            ...prev.security, 
+                                            twoFactorEnabled: isEnabled,
+                                            twoFactorSecret: currentSecret
+                                        }
+                                    }));
+                                }}
                             />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                         </label>
@@ -333,24 +352,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     {localSettings.security.twoFactorEnabled && (
                         <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700 animate-in fade-in slide-in-from-top-2">
                             <div className="flex gap-6 items-center">
-                                <div className="bg-white p-2 rounded-lg">
-                                    {/* Placeholder for QR Code */}
-                                    <div className="w-32 h-32 bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300 rounded">
-                                        <Smartphone className="w-8 h-8 text-gray-400"/>
-                                    </div>
+                                <div className="bg-white p-2 rounded-lg shadow-sm border border-gray-200">
+                                    <QRCodeSVG 
+                                        value={generateTotpUri(localSettings.security.twoFactorSecret)}
+                                        size={140}
+                                        level="M"
+                                    />
                                 </div>
                                 <div className="flex-1">
                                     <p className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">Setup Instructions</p>
                                     <ol className="list-decimal list-inside text-sm text-gray-600 dark:text-slate-400 space-y-1">
                                         <li>Download Google Authenticator or Authy.</li>
-                                        <li>Scan the QR code (Mock).</li>
+                                        <li>Scan the QR code to the left.</li>
                                         <li>Or enter the secret key manually:</li>
                                     </ol>
-                                    <div className="mt-3 p-3 bg-gray-200 dark:bg-slate-900 rounded font-mono text-center tracking-widest font-bold text-gray-800 dark:text-slate-200 border border-gray-300 dark:border-slate-700">
+                                    <div className="mt-3 p-3 bg-gray-200 dark:bg-slate-900 rounded font-mono text-center tracking-widest font-bold text-gray-800 dark:text-slate-200 border border-gray-300 dark:border-slate-700 select-all">
                                         {localSettings.security.twoFactorSecret}
                                     </div>
                                     <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-2 flex items-center gap-1">
-                                        <Lock className="w-3 h-3"/> Warning: Save this key. It will not be shown again.
+                                        <Lock className="w-3 h-3"/> Warning: Save this key. It will be hidden if you navigate away.
                                     </p>
                                 </div>
                             </div>

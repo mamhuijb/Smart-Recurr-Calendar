@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Lock, ArrowRight, ShieldCheck } from 'lucide-react';
 import { BrandingSettings, SecuritySettings } from '../types';
+import { verifyToken } from '../utils/authSecurity';
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -30,12 +31,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding, sec
             setError('Invalid credentials');
         }
     } else {
-        // Mock 2FA Validation
-        // In a real app, verify against TOTP secret
-        if (twoFactorCode === '123456' || twoFactorCode.length === 6) { 
+        // Real-world TOTP Validation
+        if (security?.twoFactorSecret && verifyToken(twoFactorCode, security.twoFactorSecret)) { 
             onLogin();
         } else {
-            setError('Invalid 2FA Code (Demo: 123456)');
+            setError('Invalid 2FA Code');
         }
     }
   };
