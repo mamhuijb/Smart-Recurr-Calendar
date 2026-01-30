@@ -12,7 +12,9 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "lucide-react": "^0.292.0",
-    "@google/genai": "^0.1.0"
+    "@google/genai": "^1.37.0",
+    "otpauth": "^9.4.1",
+    "qrcode.react": "^3.1.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",

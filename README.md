@@ -49,3 +49,7 @@ Log in as `admin` to access the Admin Panel.
 *   **Branding:** Change the Logo and Primary Color (Hex).
 *   **Theme:** Toggle between Light and Dark mode.
 *   **Business Hours:** Configure opening times and holidays.
+
+## Local/Node Production Notes
+- Set `GEMINI_API_KEY` in the server environment so the `/api/recurrence` proxy can call Gemini.
+- The frontend no longer embeds the Gemini key; it expects the server proxy to be configured.

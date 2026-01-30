@@ -19,22 +19,40 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding, sec
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // #region agent log
+    fetch('/api/debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LoginScreen.tsx:handleSubmit:start',message:'login submit',data:{step,usernameLength:username.length,twoFactorEnabled:!!security?.twoFactorEnabled},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-change',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
     if (step === 'CREDENTIALS') {
         if (username === 'webmaster' && password === 'ngramO3365!@#21') {
             if (security?.twoFactorEnabled) {
+                // #region agent log
+                fetch('/api/debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LoginScreen.tsx:handleSubmit:credentials-ok-2fa',message:'credentials ok, 2fa required',data:{step},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-change',hypothesisId:'H1'})}).catch(()=>{});
+                // #endregion
                 setStep('2FA');
                 setError('');
             } else {
+                // #region agent log
+                fetch('/api/debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LoginScreen.tsx:handleSubmit:credentials-ok',message:'credentials ok, logging in',data:{step},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-change',hypothesisId:'H1'})}).catch(()=>{});
+                // #endregion
                 onLogin();
             }
         } else {
+            // #region agent log
+            fetch('/api/debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LoginScreen.tsx:handleSubmit:credentials-fail',message:'credentials invalid',data:{step},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-change',hypothesisId:'H1'})}).catch(()=>{});
+            // #endregion
             setError('Invalid credentials');
         }
     } else {
         // Real-world TOTP Validation
         if (security?.twoFactorSecret && verifyToken(twoFactorCode, security.twoFactorSecret)) { 
+            // #region agent log
+            fetch('/api/debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LoginScreen.tsx:handleSubmit:2fa-ok',message:'2fa ok, logging in',data:{step,twoFactorDigits:twoFactorCode.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-change',hypothesisId:'H1'})}).catch(()=>{});
+            // #endregion
             onLogin();
         } else {
+            // #region agent log
+            fetch('/api/debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LoginScreen.tsx:handleSubmit:2fa-fail',message:'2fa invalid',data:{step,twoFactorDigits:twoFactorCode.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-change',hypothesisId:'H1'})}).catch(()=>{});
+            // #endregion
             setError('Invalid 2FA Code');
         }
     }

@@ -7,7 +7,7 @@ import { ReminderDashboard } from './components/ReminderDashboard';
 import { LoginScreen } from './components/LoginScreen';
 import { AdminPanel } from './components/AdminPanel';
 import { SecureStorage } from './utils/secureStorage';
-import { Plus, Calendar as CalendarIcon, Clock, Trash2, LogOut, Settings, Download, MapPin, Headset, Sun, Moon } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Clock, Trash2, LogOut, Settings, Download, MapPin, Headphones, Sun, Moon } from 'lucide-react';
 import { hexToRgb } from './utils/colorUtils'; // We'll create this helper inline if needed or assume logic here
 
 const App: React.FC = () => {
@@ -81,6 +81,9 @@ const App: React.FC = () => {
     setCustomers(loadedCustomers);
     setServices(loadedServices);
     setTechnicians(loadedTechs);
+    // #region agent log
+    fetch('/api/debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:useEffect:init',message:'init from storage',data:{authFlag:auth === 'true',eventsCount:loadedEvents.length,customersCount:loadedCustomers.length,servicesCount:loadedServices.length,techniciansCount:loadedTechs.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-change',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
   }, []);
 
   // Persist Data on Change
@@ -287,7 +290,7 @@ const App: React.FC = () => {
                                             </span>
                                         )}
                                         <span className="text-[10px] bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 px-1.5 py-0.5 rounded border border-gray-300 dark:border-slate-600 inline-flex items-center gap-1">
-                                            {event.locationType === 'ON_SITE' ? <MapPin className="w-2 h-2"/> : <Headset className="w-2 h-2"/>}
+                                            {event.locationType === 'ON_SITE' ? <MapPin className="w-2 h-2"/> : <Headphones className="w-2 h-2"/>}
                                             {event.locationType === 'ON_SITE' ? 'On Site' : 'Remote'}
                                         </span>
                                     </div>

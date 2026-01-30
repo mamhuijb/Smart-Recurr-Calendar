@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppSettings, Customer, Service, Technician, RecurrenceEvent } from '../types';
-import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone } from 'lucide-react';
+import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headphones, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone } from 'lucide-react';
 import { startOAuthFlow } from '../services/authService';
 import { SecureStorage } from '../utils/secureStorage';
 import { QRCodeSVG } from 'qrcode.react';
@@ -718,7 +718,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <div className="flex gap-2">
                                         <span className="text-xs bg-gray-200 dark:bg-slate-700 px-2 py-0.5 rounded text-gray-600 dark:text-slate-300">{s.type}</span>
                                         <span className="text-xs bg-gray-200 dark:bg-slate-700 px-2 py-0.5 rounded text-gray-600 dark:text-slate-300 flex items-center gap-1">
-                                            {s.defaultLocation === 'ON_SITE' ? <MapPin className="w-3 h-3"/> : <Headset className="w-3 h-3"/>}
+                                            {s.defaultLocation === 'ON_SITE' ? <MapPin className="w-3 h-3"/> : <Headphones className="w-3 h-3"/>}
                                             {s.defaultLocation === 'ON_SITE' ? 'On Site' : 'Remote'}
                                         </span>
                                     </div>

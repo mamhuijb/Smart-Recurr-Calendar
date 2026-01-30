@@ -1,6 +1,6 @@
 import React from 'react';
 import { RecurrenceEvent, Technician, BusinessHours } from '../types';
-import { ChevronLeft, ChevronRight, Plus, AlertCircle, MapPin, Headset, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, AlertCircle, MapPin, Headphones, Lock } from 'lucide-react';
 
 interface CalendarGridProps {
   events: RecurrenceEvent[];
@@ -137,7 +137,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                         title={ev.title}
                     >
                         {ev.locationType === 'REMOTE' ? (
-                            <Headset className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                            <Headphones className="w-3 h-3 text-slate-400 flex-shrink-0" />
                         ) : (
                             <MapPin className="w-3 h-3 text-indigo-400 flex-shrink-0" />
                         )}

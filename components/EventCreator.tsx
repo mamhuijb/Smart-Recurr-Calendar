@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { parseRecurrenceRule } from '../services/geminiService';
 import { generateRecurrenceDates, getReadableRule, Frequency, Ordinal, DayOfWeek, RecurrenceType } from '../utils/recurrenceEngine';
 import { RecurrenceEvent, Customer, Service, Technician, LocationType } from '../types';
-import { Loader2, CalendarCheck, Sparkles, ArrowLeft, User, Briefcase, UserCog, Ticket, CalendarDays, MapPin, Headset, Calculator, Wand2, Clock, Repeat, Calendar } from 'lucide-react';
+import { Loader2, CalendarCheck, Sparkles, ArrowLeft, User, Briefcase, UserCog, Ticket, CalendarDays, MapPin, Headphones, Calculator, Wand2, Clock, Repeat, Calendar } from 'lucide-react';
 
 interface EventCreatorProps {
   initialRule?: string;
@@ -169,6 +169,9 @@ export const EventCreator: React.FC<EventCreatorProps> = ({
       status: 'SCHEDULED',
       createdAt: Date.now(),
     };
+    // #region agent log
+    fetch('/api/debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EventCreator.tsx:handleConfirm',message:'event confirmed',data:{scheduleType,previewDatesCount:previewDates.length,hasCustomer:!!selectedCustomer,hasService:!!selectedService,hasTechnician:!!selectedTech,locationType},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-change',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
     onSave(newEvent);
   };
 
@@ -214,7 +217,7 @@ export const EventCreator: React.FC<EventCreatorProps> = ({
                         <MapPin className="w-3.5 h-3.5" /> On Location
                     </button>
                     <button onClick={() => setLocationType('REMOTE')} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-bold transition-all ${locationType === 'REMOTE' ? 'bg-slate-600 shadow text-indigo-400' : 'text-slate-400 hover:text-slate-200'}`}>
-                        <Headset className="w-3.5 h-3.5" /> Remote
+                        <Headphones className="w-3.5 h-3.5" /> Remote
                     </button>
                 </div>
 
