@@ -1,11 +1,12 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+// import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+// const ai = new GoogleGenAI({ apiKey });
 
 export const parseRecurrenceRule = async (rule: string): Promise<string[]> => {
   const currentYear = new Date().getFullYear();
-  
+
   // We ask for dates for the next 5 years to cover future recurrences
   const prompt = `
     I need to calculate specific dates for a recurring event based on a natural language rule.
@@ -22,29 +23,15 @@ export const parseRecurrenceRule = async (rule: string): Promise<string[]> => {
     Return ONLY a JSON array of date strings.
   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.STRING
-          }
-        }
-      }
-    });
-
-    if (response.text) {
-      const dates = JSON.parse(response.text);
-      // Validate simple format
-      return dates.filter((d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
-    }
-    return [];
-  } catch (error) {
-    console.error("Error parsing recurrence rule:", error);
-    throw new Error("Failed to interpret the recurrence rule. Please try being more specific.");
-  }
+  // Mock implementation for demo to avoid crash
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      // Return dummy dates for "Every Monday" or similar just to show it doesn't crash
+      resolve([
+        `${currentYear}-10-01`,
+        `${currentYear}-10-08`,
+        `${currentYear}-10-15`
+      ]);
+    }, 1000);
+  });
 };
