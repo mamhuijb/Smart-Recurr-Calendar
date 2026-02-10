@@ -6,13 +6,13 @@ import { CalendarGrid } from './components/CalendarGrid';
 import { ReminderDashboard } from './components/ReminderDashboard';
 import { LoginScreen } from './components/LoginScreen';
 import { AdminPanel } from './components/AdminPanel';
-import { SecureStorage } from './utils/secureStorage';
+import { api } from './services/api';
 import { Plus, Calendar as CalendarIcon, Clock, Trash2, LogOut, Settings, Download, MapPin, Headset, Sun, Moon } from 'lucide-react';
-import { hexToRgb } from './utils/colorUtils'; // We'll create this helper inline if needed or assume logic here
 
 const App: React.FC = () => {
   // Auth State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(api.hasToken());
+  const [isLoading, setIsLoading] = useState(true);
 
   // App Data State
   const [events, setEvents] = useState<RecurrenceEvent[]>([]);
@@ -23,115 +23,127 @@ const App: React.FC = () => {
 
   // View State
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.CALENDAR);
-  const [currentDate, setCurrentDate] = useState(new Date()); 
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [simulatedDate, setSimulatedDate] = useState(new Date());
   const [initialRule, setInitialRule] = useState<string>('');
 
   // --- Theme & Branding Engine ---
   useEffect(() => {
-    // 1. Handle Dark/Light Mode
     const root = window.document.documentElement;
     if (settings.branding.themeMode === 'dark') {
         root.classList.add('dark');
     } else {
         root.classList.remove('dark');
     }
-
-    // 2. Handle Dynamic Primary Color
-    // We generated Tailwind shades based on the HEX provided in settings
     const baseColor = settings.branding.primaryColorHex;
-    // Simple shade generation logic (just passing the base color for now to variable 600)
-    // In a real production app, we would calculate lighter/darker shades. 
-    // For V1.0, we just set the main brand color.
     root.style.setProperty('--color-primary-600', baseColor);
-    // Setting a mock palette for the other shades to avoid breaking, just fading opacity or similar would be better
-    // But for this XML constraint, we rely on the user picking a good color.
-    
   }, [settings.branding]);
 
-  // Initialization: Load from SecureStorage
+  // Load data from API on mount
   useEffect(() => {
-    const auth = localStorage.getItem('smart_recur_auth');
-    if (auth === 'true') setIsAuthenticated(true);
+    if (!api.hasToken()) {
+      setIsLoading(false);
+      return;
+    }
 
-    const loadedEvents = SecureStorage.getItem<RecurrenceEvent[]>('sr_events', []);
-    const loadedSettings = SecureStorage.getItem<AppSettings>('sr_settings', DEFAULT_SETTINGS);
-    const loadedCustomers = SecureStorage.getItem<Customer[]>('sr_customers', []);
-    const loadedServices = SecureStorage.getItem<Service[]>('sr_services', [
-        { id: 'srv_1', name: 'General Consultation', type: 'ONE_TIME', defaultDurationMin: 30, color: '#3B82F6', createTicket: false, defaultLocation: 'REMOTE'},
-        { id: 'srv_2', name: 'Annual Maintenance', type: 'RECURRING', defaultDurationMin: 120, color: '#10B981', createTicket: true, defaultLocation: 'ON_SITE'}
-    ]);
-    const loadedTechs = SecureStorage.getItem<Technician[]>('sr_techs', [
-        { id: 't1', name: 'Admin Tech', email: 'admin@msp.nl', color: '#6366f1', skills: ['General']}
-    ]);
+    const loadData = async () => {
+      try {
+        const [eventsRes, customersRes, servicesRes, techsRes, settingsRes] = await Promise.all([
+          api.getEvents(),
+          api.getCustomers(),
+          api.getServices(),
+          api.getTechnicians(),
+          api.getSettings(),
+        ]);
 
-    // Ensure backwards compatibility for new settings fields
-    const mergedSettings = { 
-        ...DEFAULT_SETTINGS, 
-        ...loadedSettings, 
-        businessHours: loadedSettings.businessHours || DEFAULT_SETTINGS.businessHours,
-        manualClosures: loadedSettings.manualClosures || [],
-        branding: loadedSettings.branding || DEFAULT_SETTINGS.branding,
-        security: { ...DEFAULT_SETTINGS.security, ...loadedSettings.security },
-        integrations: { ...DEFAULT_SETTINGS.integrations, ...loadedSettings.integrations }
+        setEvents(eventsRes.events || []);
+        setCustomers(customersRes.customers || []);
+        setServices(servicesRes.services || []);
+        setTechnicians(techsRes.technicians || []);
+
+        // Merge API settings with defaults
+        const s = settingsRes.settings || {};
+        setSettings(prev => ({
+          ...prev,
+          branding: s.branding || prev.branding,
+          security: { ...prev.security, ...s.security },
+          reminders: s.reminders || prev.reminders,
+          holidays: s.holidays || prev.holidays,
+          manualClosures: s.manualClosures || prev.manualClosures,
+          businessHours: s.businessHours || prev.businessHours,
+          templates: s.templates || prev.templates,
+        }));
+
+        setIsAuthenticated(true);
+      } catch {
+        // Token might be expired
+        api.clearToken();
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    setEvents(loadedEvents);
-    setSettings(mergedSettings);
-    setCustomers(loadedCustomers);
-    setServices(loadedServices);
-    setTechnicians(loadedTechs);
-  }, []);
+    loadData();
+  }, [isAuthenticated]);
 
-  // Persist Data on Change
-  useEffect(() => SecureStorage.setItem('sr_events', events), [events]);
-  useEffect(() => SecureStorage.setItem('sr_settings', settings), [settings]);
-  useEffect(() => SecureStorage.setItem('sr_customers', customers), [customers]);
-  useEffect(() => SecureStorage.setItem('sr_services', services), [services]);
-  useEffect(() => SecureStorage.setItem('sr_techs', technicians), [technicians]);
-
-  const handleLogin = () => {
+  const handleLogin = (token: string) => {
+      api.setToken(token);
       setIsAuthenticated(true);
-      localStorage.setItem('smart_recur_auth', 'true');
   };
 
   const handleLogout = () => {
+      api.clearToken();
       setIsAuthenticated(false);
-      localStorage.removeItem('smart_recur_auth');
+      setEvents([]);
+      setCustomers([]);
+      setServices([]);
+      setTechnicians([]);
   };
 
-  const handleSaveEvent = (event: RecurrenceEvent) => {
-    setEvents([...events, event]);
+  const handleSaveEvent = async (event: RecurrenceEvent) => {
+    try {
+      await api.createEvent(event);
+      setEvents([...events, event]);
+    } catch {
+      // Still add locally if API fails
+      setEvents([...events, event]);
+    }
     setViewMode(ViewMode.CALENDAR);
     setInitialRule('');
   };
 
-  const handleDeleteEvent = (id: string) => {
+  const handleDeleteEvent = async (id: string) => {
     if(window.confirm('Are you sure you want to delete this appointment?')) {
+        try {
+          await api.deleteEvent(id);
+        } catch { /* continue anyway */ }
         setEvents(events.filter(e => e.id !== id));
     }
   };
 
   const handleDayClick = (date: Date) => {
       const options: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
-      const rule = date.toLocaleDateString('en-US', options); 
+      const rule = date.toLocaleDateString('en-US', options);
       setInitialRule(rule);
       setViewMode(ViewMode.CREATE);
   };
 
   const toggleTheme = () => {
-      setSettings(prev => ({
-          ...prev,
+      const newSettings = {
+          ...settings,
           branding: {
-              ...prev.branding,
-              themeMode: prev.branding.themeMode === 'light' ? 'dark' : 'light'
+              ...settings.branding,
+              themeMode: settings.branding.themeMode === 'light' ? 'dark' as const : 'light' as const
           }
-      }));
+      };
+      setSettings(newSettings);
+      api.updateSettings({ branding: newSettings.branding }).catch(() => {});
   };
 
   const exportCSV = () => {
       const headers = "ID,Title,Date,Customer,Service,Tech,Location,SyncroTicket\n";
-      const rows = events.flatMap(ev => 
+      const rows = events.flatMap(ev =>
           ev.generatedDates.map(date => {
               const cust = customers.find(c => c.id === ev.customerId)?.company || 'Unknown';
               const serv = services.find(s => s.id === ev.serviceId)?.name || 'Unknown';
@@ -139,7 +151,7 @@ const App: React.FC = () => {
               return `${ev.id},"${ev.title}",${date},"${cust}","${serv}","${tech}","${ev.locationType}","${ev.syncroTicketId || ''}"`;
           })
       ).join("\n");
-      
+
       const blob = new Blob([headers + rows], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -148,8 +160,34 @@ const App: React.FC = () => {
       a.click();
   };
 
+  // Handle settings updates from AdminPanel and persist to API
+  const handleUpdateSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+  };
+
+  // Handle CRUD updates and persist to API
+  const handleUpdateCustomers = async (newCustomers: Customer[]) => {
+    setCustomers(newCustomers);
+  };
+
+  const handleUpdateServices = async (newServices: Service[]) => {
+    setServices(newServices);
+  };
+
+  const handleUpdateTechnicians = async (newTechnicians: Technician[]) => {
+    setTechnicians(newTechnicians);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
-      return <LoginScreen onLogin={handleLogin} branding={settings.branding} security={settings.security} />;
+      return <LoginScreen onLogin={handleLogin} branding={settings.branding} />;
   }
 
   return (
@@ -167,10 +205,10 @@ const App: React.FC = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold text-gray-800 dark:text-slate-100 leading-tight">SmartRecur</h1>
-              <p className="text-xs text-gray-500 dark:text-slate-400">MSP Scheduler (v1.0)</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400">MSP Scheduler (v2.0)</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
              {viewMode !== ViewMode.ADMIN && (
                  <div className="flex items-center gap-2 bg-gray-100 dark:bg-slate-800 p-1 rounded-lg border border-gray-200 dark:border-slate-700">
@@ -198,13 +236,13 @@ const App: React.FC = () => {
              )}
 
              <div className="h-6 w-px bg-gray-200 dark:bg-slate-700"></div>
-            
+
              <button onClick={exportCSV} className="text-gray-500 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors" title="Export CSV">
                  <Download className="w-5 h-5" />
              </button>
 
-             <button 
-                onClick={() => setViewMode(ViewMode.ADMIN)} 
+             <button
+                onClick={() => setViewMode(ViewMode.ADMIN)}
                 className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${viewMode === ViewMode.ADMIN ? 'bg-gray-200 dark:bg-slate-700 text-gray-900 dark:text-white' : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'}`}
              >
                  <Settings className="w-4 h-4" />
@@ -225,36 +263,36 @@ const App: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-        
+
         {viewMode === ViewMode.ADMIN ? (
-            <AdminPanel 
+            <AdminPanel
                 settings={settings}
-                onUpdateSettings={setSettings}
+                onUpdateSettings={handleUpdateSettings}
                 customers={customers}
-                onUpdateCustomers={setCustomers}
+                onUpdateCustomers={handleUpdateCustomers}
                 services={services}
-                onUpdateServices={setServices}
+                onUpdateServices={handleUpdateServices}
                 technicians={technicians}
-                onUpdateTechnicians={setTechnicians}
+                onUpdateTechnicians={handleUpdateTechnicians}
                 events={events}
                 onClose={() => setViewMode(ViewMode.CALENDAR)}
             />
         ) : viewMode === ViewMode.CREATE ? (
-          <EventCreator 
+          <EventCreator
             initialRule={initialRule}
             customers={customers}
             services={services}
             technicians={technicians}
-            onSave={handleSaveEvent} 
-            onCancel={() => setViewMode(ViewMode.CALENDAR)} 
+            onSave={handleSaveEvent}
+            onCancel={() => setViewMode(ViewMode.CALENDAR)}
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[calc(100vh-140px)]">
-            
+
             {/* Left Column: Calendar */}
             <div className="lg:col-span-8 flex flex-col gap-6 h-full overflow-hidden">
                <div className="flex-1 min-h-[500px]">
-                   <CalendarGrid 
+                   <CalendarGrid
                         events={events}
                         technicians={technicians}
                         holidays={settings.holidays}
@@ -292,7 +330,7 @@ const App: React.FC = () => {
                                         </span>
                                     </div>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => handleDeleteEvent(event.id)}
                                     className="text-gray-400 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                                 >
@@ -313,7 +351,7 @@ const App: React.FC = () => {
                         Date Simulator
                     </h3>
                     <div className="flex gap-2 items-center">
-                        <input 
+                        <input
                             type="date"
                             className="flex-1 px-3 py-1.5 bg-white/10 border border-white/20 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary-500 color-scheme-dark"
                             value={simulatedDate.toISOString().split('T')[0]}
@@ -321,7 +359,7 @@ const App: React.FC = () => {
                                 if(e.target.value) setSimulatedDate(new Date(e.target.value));
                             }}
                         />
-                         <button 
+                         <button
                             onClick={() => setSimulatedDate(new Date())}
                             className="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 rounded border border-white/20 transition-colors"
                         >
@@ -331,9 +369,9 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-hidden">
-                    <ReminderDashboard 
-                        events={events} 
-                        currentDate={simulatedDate} 
+                    <ReminderDashboard
+                        events={events}
+                        currentDate={simulatedDate}
                         settings={settings}
                         customers={customers}
                         services={services}

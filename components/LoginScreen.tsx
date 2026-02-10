@@ -1,42 +1,46 @@
 
 import React, { useState } from 'react';
 import { Lock, ArrowRight, ShieldCheck } from 'lucide-react';
-import { BrandingSettings, SecuritySettings } from '../types';
-import { verifyToken } from '../utils/authSecurity';
+import { BrandingSettings } from '../types';
+import { api } from '../services/api';
 
 interface LoginScreenProps {
-  onLogin: () => void;
+  onLogin: (token: string) => void;
   branding?: BrandingSettings;
-  security?: SecuritySettings;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding, security }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding }) => {
   const [step, setStep] = useState<'CREDENTIALS' | '2FA'>('CREDENTIALS');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [tempToken, setTempToken] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (step === 'CREDENTIALS') {
-        if (username === 'webmaster' && password === 'ngramO3365!@#21') {
-            if (security?.twoFactorEnabled) {
-                setStep('2FA');
-                setError('');
-            } else {
-                onLogin();
-            }
-        } else {
-            setError('Invalid credentials');
+    setError('');
+    setLoading(true);
+
+    try {
+      if (step === 'CREDENTIALS') {
+        const res = await api.login(username, password);
+
+        if (res.requires_2fa) {
+          setTempToken(res.temp_token!);
+          setStep('2FA');
+        } else if (res.token) {
+          onLogin(res.token);
         }
-    } else {
-        // Real-world TOTP Validation
-        if (security?.twoFactorSecret && verifyToken(twoFactorCode, security.twoFactorSecret)) { 
-            onLogin();
-        } else {
-            setError('Invalid 2FA Code');
-        }
+      } else {
+        const res = await api.verify2FA(tempToken, twoFactorCode);
+        onLogin(res.token);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -57,10 +61,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding, sec
             <p className="text-primary-100 mt-2 text-sm font-medium">MSP Calendar Management</p>
           </div>
         </div>
-        
+
         <div className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            
+
             {step === 'CREDENTIALS' ? (
                 <>
                     <div>
@@ -73,7 +77,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding, sec
                         onChange={(e) => setUsername(e.target.value)}
                     />
                     </div>
-                    
+
                     <div>
                     <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Password</label>
                     <input
@@ -94,7 +98,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding, sec
                     </div>
                     <h3 className="text-center font-bold text-gray-800 dark:text-white mb-4">Two-Factor Authentication</h3>
                     <p className="text-center text-sm text-gray-500 dark:text-slate-400 mb-6">Please enter the 6-digit code from your authenticator app.</p>
-                    
+
                     <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Authentication Code</label>
                     <input
                         type="text"
@@ -116,16 +120,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding, sec
 
             <button
               type="submit"
-              className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 group shadow-lg shadow-primary-900/50"
+              disabled={loading}
+              className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 group shadow-lg shadow-primary-900/50 disabled:opacity-50"
             >
-              {step === 'CREDENTIALS' ? (
+              {loading ? (
+                  <span className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+              ) : step === 'CREDENTIALS' ? (
                   <>
                     Sign In
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </>
               ) : 'Verify Code'}
             </button>
-            
+
             {step === '2FA' && (
                 <button type="button" onClick={() => setStep('CREDENTIALS')} className="w-full text-sm text-gray-500 hover:text-gray-700 dark:hover:text-slate-300">
                     Back to login

@@ -1,11 +1,16 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AppSettings, Customer, Service, Technician, RecurrenceEvent } from '../types';
-import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone } from 'lucide-react';
-import { startOAuthFlow } from '../services/authService';
-import { SecureStorage } from '../utils/secureStorage';
+import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateSecret, generateTotpUri } from '../utils/authSecurity';
+
+interface IntegrationStatus {
+    isConnected: boolean;
+    lastChecked: string | null;
+    message?: string;
+}
 
 interface AdminPanelProps {
     settings: AppSettings;
@@ -36,6 +41,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
     const [activeTab, setActiveTab] = useState<Tab>('REPORTS');
     const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
+    const [integrationStatus, setIntegrationStatus] = useState<Record<string, IntegrationStatus>>({});
+    const [testingIntegration, setTestingIntegration] = useState<string | null>(null);
+
+    // Fetch integration status from API on mount
+    useEffect(() => {
+        api.getIntegrationStatus().then(res => {
+            setIntegrationStatus(res.integrations || {});
+        }).catch(() => {});
+    }, []);
     const [newService, setNewService] = useState<Partial<Service>>({ name: '', type: 'RECURRING', color: '#4F46E5', createTicket: true, defaultLocation: 'ON_SITE' });
     const [newTech, setNewTech] = useState({ name: '', email: '', color: '#10B981' });
     const [newCustomer, setNewCustomer] = useState<Partial<Customer>>({ company: '', name: '', email: '', phone: '', address: '', postcode: '' });
@@ -70,53 +84,82 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return { total, quarters, monthly, remoteCount, onsiteCount, currentYear };
     }, [events]);
 
-    // Syncro MSP Mock Import
+    // Syncro MSP Import via PHP backend proxy
     const handleSyncroImport = async () => {
         try {
-            // Production: Call our secure backend which proxies to Syncro
-            const res = await fetch('/api/syncro/customers');
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || 'Failed to fetch');
+            // First save any updated config
+            await api.saveIntegrationConfig('syncro', {
+                apiKey: localSettings.integrations.syncroApiKey,
+                subdomain: localSettings.integrations.syncroSubdomain,
+            });
+
+            const data = await api.syncroImportCustomers();
+            const newCusts = data.customers.filter((c: Customer) => !customers.some(ex => ex.syncroId === c.syncroId));
+
+            // Save imported customers to database
+            for (const c of newCusts) {
+                await api.createCustomer(c);
             }
 
-            const data = await res.json();
-            // Merge with existing, avoiding duplicates by ID
-            const newCusts = data.customers.filter((c: Customer) => !customers.some(ex => ex.id === c.id));
-
             onUpdateCustomers([...customers, ...newCusts]);
-            alert(`Successfully imported ${newCusts.length} new customers from SyncroMSP API.`);
+            alert(`Successfully imported ${newCusts.length} new customers from SyncroMSP.`);
         } catch (e: any) {
-            console.error(e);
-            alert(`Import failed: ${e.message}\nMake sure SYNCRO_API_KEY is set in your .env file.`);
+            alert(`Import failed: ${e.message}`);
         }
     };
 
     const handleOAuthConnect = async () => {
         try {
-            const authState = await startOAuthFlow(localSettings.office365.clientId, localSettings.office365.tenantId);
-            setLocalSettings({
-                ...localSettings,
-                office365: {
-                    ...localSettings.office365,
-                    auth: authState
-                }
+            // Save config first
+            await api.saveIntegrationConfig('office365', {
+                clientId: localSettings.office365.clientId,
+                tenantId: localSettings.office365.tenantId,
             });
-            alert("Connected to Office 365!");
+
+            const { url } = await api.getOffice365AuthUrl();
+            const width = 500, height = 600;
+            const left = window.screen.width / 2 - width / 2;
+            const top = window.screen.height / 2 - height / 2;
+            const popup = window.open(url, 'Office 365 Login', `width=${width},height=${height},top=${top},left=${left}`);
+
+            if (!popup) { alert('Popup blocked. Please allow popups.'); return; }
+
+            const handler = (event: MessageEvent) => {
+                if (event.origin !== window.location.origin) return;
+                if (event.data.type === 'OAUTH_SUCCESS') {
+                    window.removeEventListener('message', handler);
+                    popup.close();
+                    setLocalSettings(prev => ({
+                        ...prev,
+                        office365: { ...prev.office365, auth: { isConnected: true, userEmail: event.data.email } }
+                    }));
+                    setIntegrationStatus(prev => ({ ...prev, office365: { isConnected: true, lastChecked: new Date().toISOString() } }));
+                    alert('Connected to Office 365!');
+                } else if (event.data.type === 'OAUTH_ERROR') {
+                    window.removeEventListener('message', handler);
+                    popup.close();
+                    alert(`Auth failed: ${event.data.error}`);
+                }
+            };
+            window.addEventListener('message', handler);
         } catch (e: any) {
             alert(`Auth failed: ${e.message}`);
         }
     };
 
-    const handleBackup = () => {
-        const data = SecureStorage.getAll();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `smartrecur_full_backup_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+    const handleBackup = async () => {
+        try {
+            const data = await api.exportBackup();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `smartrecur_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e: any) {
+            alert(`Backup failed: ${e.message}`);
+        }
     };
 
     const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,10 +167,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
             try {
                 const json = JSON.parse(event.target?.result as string);
-                SecureStorage.restoreAll(json);
+                await api.importBackup(json);
                 alert("Database restored successfully! The application will now reload.");
                 window.location.reload();
             } catch (err) {
@@ -137,22 +180,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         reader.readAsText(file);
     };
 
-    const testIntegration = (type: 'invoiceNinja' | 'zoho') => {
-        // Simulate API ping
-        setTimeout(() => {
-            setLocalSettings(prev => ({
+    const testIntegration = async (type: string) => {
+        setTestingIntegration(type);
+        try {
+            // Save config before testing
+            if (type === 'invoiceninja') {
+                await api.saveIntegrationConfig('invoiceninja', {
+                    apiKey: localSettings.integrations.invoiceNinja.apiKey,
+                    endpoint: localSettings.integrations.invoiceNinja.endpoint,
+                });
+            } else if (type === 'zoho') {
+                await api.saveIntegrationConfig('zoho', {
+                    apiKey: localSettings.integrations.zoho.apiKey,
+                    apiSecret: localSettings.integrations.zoho.apiSecret,
+                    endpoint: localSettings.integrations.zoho.endpoint,
+                });
+            } else if (type === 'syncro') {
+                await api.saveIntegrationConfig('syncro', {
+                    apiKey: localSettings.integrations.syncroApiKey,
+                    subdomain: localSettings.integrations.syncroSubdomain,
+                });
+            } else if (type === 'office365') {
+                await api.saveIntegrationConfig('office365', {
+                    clientId: localSettings.office365.clientId,
+                    tenantId: localSettings.office365.tenantId,
+                });
+            }
+
+            const result = await api.testIntegration(type);
+            setIntegrationStatus(prev => ({
                 ...prev,
-                integrations: {
-                    ...prev.integrations,
-                    [type]: {
-                        ...prev.integrations[type],
-                        isConnected: true,
-                        lastChecked: Date.now()
-                    }
-                }
+                [type]: { isConnected: result.isConnected, lastChecked: new Date().toISOString(), message: result.message }
             }));
-            alert(`Successfully connected to ${type === 'invoiceNinja' ? 'InvoiceNinja' : 'Zoho'}!`);
-        }, 1500);
+            alert(result.message);
+        } catch (e: any) {
+            setIntegrationStatus(prev => ({
+                ...prev,
+                [type]: { isConnected: false, lastChecked: new Date().toISOString(), message: e.message }
+            }));
+            alert(`Connection test failed: ${e.message}`);
+        } finally {
+            setTestingIntegration(null);
+        }
     };
 
     const handleAddService = () => {
@@ -202,9 +271,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setNewCustomer({ company: '', name: '', email: '', phone: '', address: '', postcode: '' });
     };
 
-    const handleSaveSettings = () => {
-        onUpdateSettings(localSettings);
-        alert("Configuration saved. Theme changes will apply immediately.");
+    const handleSaveSettings = async () => {
+        try {
+            // Save app settings to database
+            await api.updateSettings({
+                branding: localSettings.branding,
+                security: localSettings.security,
+                reminders: localSettings.reminders,
+                holidays: localSettings.holidays,
+                manualClosures: localSettings.manualClosures,
+                businessHours: localSettings.businessHours,
+                templates: localSettings.templates,
+            });
+
+            // Save integration configs to database
+            await api.saveIntegrationConfig('office365', {
+                clientId: localSettings.office365.clientId,
+                tenantId: localSettings.office365.tenantId,
+            });
+            await api.saveIntegrationConfig('syncro', {
+                apiKey: localSettings.integrations.syncroApiKey,
+                subdomain: localSettings.integrations.syncroSubdomain,
+            });
+            await api.saveIntegrationConfig('invoiceninja', {
+                apiKey: localSettings.integrations.invoiceNinja.apiKey,
+                endpoint: localSettings.integrations.invoiceNinja.endpoint,
+            });
+            await api.saveIntegrationConfig('zoho', {
+                apiKey: localSettings.integrations.zoho.apiKey,
+                apiSecret: localSettings.integrations.zoho.apiSecret,
+                endpoint: localSettings.integrations.zoho.endpoint,
+            });
+
+            onUpdateSettings(localSettings);
+            alert("Configuration saved.");
+        } catch (e: any) {
+            alert(`Save failed: ${e.message}`);
+        }
     };
 
     const availableCalendars = [
@@ -252,15 +355,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <div className="px-2 pb-1 pt-4 text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-wider">Integrations</div>
                     <button onClick={() => setActiveTab('OAUTH')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'OAUTH' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <ShieldCheck className="w-4 h-4" /> Office 365
+                        {integrationStatus.office365?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
                     </button>
                     <button onClick={() => setActiveTab('INTEGRATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'INTEGRATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <RefreshCw className="w-4 h-4" /> Syncro MSP
+                        {integrationStatus.syncro?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
                     </button>
                     <button onClick={() => setActiveTab('INVOICENINJA')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'INVOICENINJA' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <Activity className="w-4 h-4" /> InvoiceNinja
+                        {integrationStatus.invoiceninja?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
                     </button>
                     <button onClick={() => setActiveTab('ZOHO')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'ZOHO' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <Activity className="w-4 h-4" /> Zoho
+                        {integrationStatus.zoho?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
                     </button>
 
                     <div className="px-2 pb-1 pt-4 text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-wider">System</div>
@@ -444,15 +551,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             <div className="flex items-center justify-between p-4 bg-gray-100 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-3 h-3 rounded-full ${localSettings.integrations.invoiceNinja.isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`}></div>
+                                    <div className={`w-3 h-3 rounded-full ${integrationStatus.invoiceninja?.isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`}></div>
                                     <div>
-                                        <p className="font-bold text-sm text-gray-800 dark:text-white">{localSettings.integrations.invoiceNinja.isConnected ? 'Active Connection' : 'Disconnected'}</p>
-                                        {localSettings.integrations.invoiceNinja.lastChecked > 0 && (
-                                            <p className="text-xs text-gray-500">Last checked: {new Date(localSettings.integrations.invoiceNinja.lastChecked).toLocaleString()}</p>
+                                        <p className="font-bold text-sm text-gray-800 dark:text-white">{integrationStatus.invoiceninja?.isConnected ? 'Active Connection' : 'Disconnected'}</p>
+                                        {integrationStatus.invoiceninja?.lastChecked && (
+                                            <p className="text-xs text-gray-500">Last checked: {new Date(integrationStatus.invoiceninja.lastChecked).toLocaleString()}</p>
+                                        )}
+                                        {integrationStatus.invoiceninja?.message && (
+                                            <p className="text-xs text-gray-500">{integrationStatus.invoiceninja.message}</p>
                                         )}
                                     </div>
                                 </div>
-                                <button onClick={() => testIntegration('invoiceNinja')} className="bg-gray-800 dark:bg-white text-white dark:text-black px-4 py-2 rounded text-sm font-medium">Test Connection</button>
+                                <button onClick={() => testIntegration('invoiceninja')} disabled={testingIntegration === 'invoiceninja'} className="bg-gray-800 dark:bg-white text-white dark:text-black px-4 py-2 rounded text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+                                    {testingIntegration === 'invoiceninja' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    Test Connection
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -484,15 +597,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             <div className="flex items-center justify-between p-4 bg-gray-100 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-3 h-3 rounded-full ${localSettings.integrations.zoho.isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`}></div>
+                                    <div className={`w-3 h-3 rounded-full ${integrationStatus.zoho?.isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`}></div>
                                     <div>
-                                        <p className="font-bold text-sm text-gray-800 dark:text-white">{localSettings.integrations.zoho.isConnected ? 'Active Connection' : 'Disconnected'}</p>
-                                        {localSettings.integrations.zoho.lastChecked > 0 && (
-                                            <p className="text-xs text-gray-500">Last checked: {new Date(localSettings.integrations.zoho.lastChecked).toLocaleString()}</p>
+                                        <p className="font-bold text-sm text-gray-800 dark:text-white">{integrationStatus.zoho?.isConnected ? 'Active Connection' : 'Disconnected'}</p>
+                                        {integrationStatus.zoho?.lastChecked && (
+                                            <p className="text-xs text-gray-500">Last checked: {new Date(integrationStatus.zoho.lastChecked).toLocaleString()}</p>
+                                        )}
+                                        {integrationStatus.zoho?.message && (
+                                            <p className="text-xs text-gray-500">{integrationStatus.zoho.message}</p>
                                         )}
                                     </div>
                                 </div>
-                                <button onClick={() => testIntegration('zoho')} className="bg-yellow-600 text-white px-4 py-2 rounded text-sm font-medium">Test Connection</button>
+                                <button onClick={() => testIntegration('zoho')} disabled={testingIntegration === 'zoho'} className="bg-yellow-600 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+                                    {testingIntegration === 'zoho' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    Test Connection
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -828,8 +947,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <span className="mt-1 px-4 py-2 bg-gray-200 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 border-l-0 rounded-r-lg text-gray-600 dark:text-slate-300">.syncromsp.com</span>
                                 </div>
                             </div>
+                            <div className="flex items-center justify-between p-4 bg-gray-100 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-3 h-3 rounded-full ${integrationStatus.syncro?.isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`}></div>
+                                    <div>
+                                        <p className="font-bold text-sm text-gray-800 dark:text-white">{integrationStatus.syncro?.isConnected ? 'Connected' : 'Disconnected'}</p>
+                                        {integrationStatus.syncro?.message && (
+                                            <p className="text-xs text-gray-500">{integrationStatus.syncro.message}</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <button onClick={() => testIntegration('syncro')} disabled={testingIntegration === 'syncro'} className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+                                    {testingIntegration === 'syncro' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    Test
+                                </button>
+                            </div>
                             <button onClick={handleSyncroImport} className="bg-green-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700">
-                                <RefreshCw className="w-4 h-4" /> Sync
+                                <RefreshCw className="w-4 h-4" /> Import Customers
                             </button>
                         </div>
                     </div>
