@@ -150,15 +150,17 @@ class SettingsController {
      * Keep the users table in sync when 2FA settings change.
      */
     private static function syncSecurityToUser(array $securitySettings): void {
+        // Get the authenticated user's ID from the JWT token
+        $auth = AuthMiddleware::verify();
+        $userId = $auth['user_id'] ?? null;
+        if (!$userId) return;
+
         $db = Database::getInstance();
-        // Update the first admin user
-        $stmt = $db->prepare('
-            UPDATE users SET two_factor_enabled = ?, two_factor_secret = ?
-            WHERE id = (SELECT id FROM (SELECT id FROM users LIMIT 1) AS t)
-        ');
+        $stmt = $db->prepare('UPDATE users SET two_factor_enabled = ?, two_factor_secret = ? WHERE id = ?');
         $stmt->execute([
             (int) ($securitySettings['twoFactorEnabled'] ?? false),
             $securitySettings['twoFactorSecret'] ?? null,
+            $userId,
         ]);
     }
 }

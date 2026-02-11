@@ -224,7 +224,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
     };
 
-    const handleAddService = () => {
+    const handleAddService = async () => {
         if (!newService.name) return;
         const s: Service = {
             id: crypto.randomUUID(),
@@ -235,11 +235,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             color: newService.color!,
             createTicket: newService.createTicket!
         };
+        try {
+            await api.createService(s);
+        } catch (e: any) {
+            alert(`Failed to save service: ${e.message}`);
+            return;
+        }
         onUpdateServices([...services, s]);
         setNewService({ name: '', type: 'RECURRING', color: '#4F46E5', createTicket: true, defaultLocation: 'ON_SITE' });
     };
 
-    const handleAddTech = () => {
+    const handleAddTech = async () => {
         if (!newTech.name) return;
         const t: Technician = {
             id: crypto.randomUUID(),
@@ -248,11 +254,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             color: newTech.color,
             skills: []
         };
+        try {
+            await api.createTechnician(t);
+        } catch (e: any) {
+            alert(`Failed to save technician: ${e.message}`);
+            return;
+        }
         onUpdateTechnicians([...technicians, t]);
         setNewTech({ name: '', email: '', color: '#10B981' });
     }
 
-    const handleAddCustomer = () => {
+    const handleAddCustomer = async () => {
         if (!newCustomer.company || !newCustomer.name) {
             alert("Company and Contact Name are required.");
             return;
@@ -267,6 +279,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             postcode: newCustomer.postcode || '',
             assets: []
         };
+        try {
+            await api.createCustomer(c);
+        } catch (e: any) {
+            alert(`Failed to save customer: ${e.message}`);
+            return;
+        }
         onUpdateCustomers([...customers, c]);
         setNewCustomer({ company: '', name: '', email: '', phone: '', address: '', postcode: '' });
     };
@@ -848,10 +866,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                         </div>
                                         <div className="flex gap-2">
                                             <button
-                                                onClick={() => {
+                                                onClick={async () => {
                                                     if (editingServiceId === s.id) {
-                                                        // Save Template
-                                                        const updated = services.map(svc => svc.id === s.id ? { ...svc, emailTemplate: editingTemplate } : svc);
+                                                        // Save Template to DB and state
+                                                        const updatedService = { ...s, emailTemplate: editingTemplate };
+                                                        try { await api.updateService(s.id, updatedService); } catch {}
+                                                        const updated = services.map(svc => svc.id === s.id ? updatedService : svc);
                                                         onUpdateServices(updated);
                                                         setEditingServiceId(null);
                                                     } else {
@@ -864,7 +884,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                             >
                                                 {editingServiceId === s.id ? 'Save Template' : 'Edit Email Template'}
                                             </button>
-                                            <button onClick={() => onUpdateServices(services.filter(x => x.id !== s.id))} className="text-red-500 hover:bg-gray-200 dark:hover:bg-slate-700 p-2 rounded">
+                                            <button onClick={async () => {
+                                                try { await api.deleteService(s.id); } catch {}
+                                                onUpdateServices(services.filter(x => x.id !== s.id));
+                                            }} className="text-red-500 hover:bg-gray-200 dark:hover:bg-slate-700 p-2 rounded">
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
@@ -988,7 +1011,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                         <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: t.color }}>{t.name.substring(0, 2).toUpperCase()}</div>
                                         <div><h4 className="font-bold text-gray-800 dark:text-white">{t.name}</h4><p className="text-sm text-gray-500 dark:text-slate-400">{t.email}</p></div>
                                     </div>
-                                    <button onClick={() => onUpdateTechnicians(technicians.filter(x => x.id !== t.id))} className="text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                    <button onClick={async () => {
+                                        try { await api.deleteTechnician(t.id); } catch {}
+                                        onUpdateTechnicians(technicians.filter(x => x.id !== t.id));
+                                    }} className="text-red-500"><Trash2 className="w-4 h-4" /></button>
                                 </div>
                             ))}
                         </div>
@@ -1062,7 +1088,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{c.assets?.length || 0}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <button onClick={() => onUpdateCustomers(customers.filter(cust => cust.id !== c.id))} className="text-red-600 hover:text-red-900 dark:hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                                                <button onClick={async () => {
+                                                    try { await api.deleteCustomer(c.id); } catch {}
+                                                    onUpdateCustomers(customers.filter(cust => cust.id !== c.id));
+                                                }} className="text-red-600 hover:text-red-900 dark:hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
                                             </td>
                                         </tr>
                                     ))}

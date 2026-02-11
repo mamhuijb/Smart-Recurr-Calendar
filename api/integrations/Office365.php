@@ -97,7 +97,17 @@ class Office365Integration {
             CURLOPT_TIMEOUT => 15,
         ]);
         $body = curl_exec($ch);
+        if ($body === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            return ['error' => ['message' => "Connection failed: $err"]];
+        }
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+        if ($code >= 400) {
+            $decoded = json_decode($body, true);
+            return $decoded ?: ['error' => ['message' => "HTTP $code"]];
+        }
         return json_decode($body ?: '{}', true) ?: [];
     }
 
@@ -121,6 +131,11 @@ class Office365Integration {
             CURLOPT_TIMEOUT        => 15,
         ]);
         $result = curl_exec($ch);
+        if ($result === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            return ['error' => "Connection failed: $err"];
+        }
         curl_close($ch);
         return json_decode($result ?: '{}', true) ?: [];
     }
