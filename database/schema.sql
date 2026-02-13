@@ -143,5 +143,6 @@ INSERT INTO integration_configs (id, config) VALUES
     ('office365', JSON_OBJECT('clientId', '', 'clientSecret', '', 'tenantId', 'common', 'redirectUri', '', 'accessToken', '', 'userEmail', '')),
     ('syncro', JSON_OBJECT('apiKey', '', 'subdomain', '')),
     ('invoiceninja', JSON_OBJECT('apiKey', '', 'endpoint', 'https://app.invoiceninja.com')),
-    ('zoho', JSON_OBJECT('apiKey', '', 'apiSecret', '', 'endpoint', 'https://www.zohoapis.com'))
+    ('zoho', JSON_OBJECT('apiKey', '', 'apiSecret', '', 'endpoint', 'https://www.zohoapis.com')),
+    ('smtp', JSON_OBJECT('host', '', 'port', 587, 'username', '', 'password', '', 'fromEmail', '', 'fromName', 'SmartRecur', 'encryption', 'tls'))
 ON DUPLICATE KEY UPDATE id = id;

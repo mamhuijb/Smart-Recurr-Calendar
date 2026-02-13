@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppSettings, Customer, Service, Technician, RecurrenceEvent } from '../types';
-import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone, Loader2 } from 'lucide-react';
+import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone, Loader2, Mail, Send } from 'lucide-react';
 import { api } from '../services/api';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateSecret, generateTotpUri } from '../utils/authSecurity';
@@ -25,7 +25,7 @@ interface AdminPanelProps {
     onClose: () => void;
 }
 
-type Tab = 'REPORTS' | 'BRANDING' | 'OAUTH' | 'INTEGRATIONS' | 'INVOICENINJA' | 'ZOHO' | 'SERVICES' | 'TECHS' | 'CUSTOMERS' | 'BUSINESS' | 'NOTIFICATIONS' | 'BACKUP' | 'SECURITY';
+type Tab = 'REPORTS' | 'BRANDING' | 'OAUTH' | 'SMTP' | 'INTEGRATIONS' | 'INVOICENINJA' | 'ZOHO' | 'SERVICES' | 'TECHS' | 'CUSTOMERS' | 'BUSINESS' | 'NOTIFICATIONS' | 'BACKUP' | 'SECURITY';
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
     settings,
@@ -205,6 +205,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     clientId: localSettings.office365.clientId,
                     tenantId: localSettings.office365.tenantId,
                 });
+            } else if (type === 'smtp') {
+                await api.saveIntegrationConfig('smtp', {
+                    host: localSettings.smtp.host,
+                    port: localSettings.smtp.port,
+                    username: localSettings.smtp.username,
+                    password: localSettings.smtp.password,
+                    fromEmail: localSettings.smtp.fromEmail,
+                    fromName: localSettings.smtp.fromName,
+                    encryption: localSettings.smtp.encryption,
+                });
             }
 
             const result = await api.testIntegration(type);
@@ -320,6 +330,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 apiSecret: localSettings.integrations.zoho.apiSecret,
                 endpoint: localSettings.integrations.zoho.endpoint,
             });
+            await api.saveIntegrationConfig('smtp', {
+                host: localSettings.smtp.host,
+                port: localSettings.smtp.port,
+                username: localSettings.smtp.username,
+                password: localSettings.smtp.password,
+                fromEmail: localSettings.smtp.fromEmail,
+                fromName: localSettings.smtp.fromName,
+                encryption: localSettings.smtp.encryption,
+            });
 
             onUpdateSettings(localSettings);
             alert("Configuration saved.");
@@ -328,11 +347,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
     };
 
-    const availableCalendars = [
-        { id: 'cal_default', name: 'Calendar (Default)' },
-        { id: 'cal_work', name: 'Work' },
-        { id: 'cal_personal', name: 'Personal' }
-    ];
+    const [availableCalendars, setAvailableCalendars] = useState<{id: string; name: string}[]>([]);
+    const [loadingCalendars, setLoadingCalendars] = useState(false);
+
+    // Fetch real calendars when Office 365 is connected
+    useEffect(() => {
+        if (localSettings.office365.auth.isConnected && integrationStatus.office365?.isConnected) {
+            setLoadingCalendars(true);
+            api.getOffice365Calendars().then(res => {
+                setAvailableCalendars(res.calendars || []);
+            }).catch(() => {
+                setAvailableCalendars([]);
+            }).finally(() => setLoadingCalendars(false));
+        }
+    }, [localSettings.office365.auth.isConnected, integrationStatus.office365?.isConnected]);
 
     return (
         <div className="flex h-full bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-gray-200 dark:border-slate-800 text-gray-800 dark:text-slate-300">
@@ -374,6 +402,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button onClick={() => setActiveTab('OAUTH')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'OAUTH' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <ShieldCheck className="w-4 h-4" /> Office 365
                         {integrationStatus.office365?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
+                    </button>
+                    <button onClick={() => setActiveTab('SMTP')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'SMTP' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
+                        <Bell className="w-4 h-4" /> SMTP Email
+                        {integrationStatus.smtp?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
                     </button>
                     <button onClick={() => setActiveTab('INTEGRATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'INTEGRATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <RefreshCw className="w-4 h-4" /> Syncro MSP
@@ -798,23 +830,158 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             )}
                         </div>
 
-                        {/* Calendar Selection (Only shows if connected) */}
+                        {/* Calendar Sync (Only shows if connected) */}
                         {localSettings.office365.auth.isConnected && (
-                            <div className="animate-in fade-in slide-in-from-top-2">
-                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-2 flex items-center gap-2"><Calendar className="w-4 h-4" /> Sync Calendar</label>
-                                <select
-                                    className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
-                                    value={localSettings.office365.selectedCalendarId || ''}
-                                    onChange={(e) => setLocalSettings({ ...localSettings, office365: { ...localSettings.office365, selectedCalendarId: e.target.value } })}
-                                >
-                                    <option value="">Select an Outlook Calendar...</option>
-                                    {availableCalendars.map(cal => (
-                                        <option key={cal.id} value={cal.id}>{cal.name}</option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Appointments created in SmartRecur will be synced to this calendar.</p>
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                                {/* Sync Toggle */}
+                                <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                                <Calendar className="w-4 h-4 text-blue-500" />
+                                                Calendar Sync
+                                            </h4>
+                                            <p className="text-sm text-gray-500 dark:text-slate-400">Automatically create Outlook calendar events when scheduling appointments.</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={localSettings.office365.calendarSyncEnabled || false}
+                                                onChange={(e) => setLocalSettings({
+                                                    ...localSettings,
+                                                    office365: { ...localSettings.office365, calendarSyncEnabled: e.target.checked }
+                                                })}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* Calendar Selection */}
+                                {localSettings.office365.calendarSyncEnabled && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-2">Target Calendar</label>
+                                        {loadingCalendars ? (
+                                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
+                                                <Loader2 className="w-4 h-4 animate-spin" /> Loading calendars...
+                                            </div>
+                                        ) : (
+                                            <select
+                                                className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
+                                                value={localSettings.office365.selectedCalendarId || ''}
+                                                onChange={(e) => setLocalSettings({ ...localSettings, office365: { ...localSettings.office365, selectedCalendarId: e.target.value } })}
+                                            >
+                                                <option value="">Default Calendar</option>
+                                                {availableCalendars.map(cal => (
+                                                    <option key={cal.id} value={cal.id}>{cal.name}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                        <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">New appointments in SmartRecur will be synced to this calendar.</p>
+                                    </div>
+                                )}
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* SMTP Tab */}
+                {activeTab === 'SMTP' && (
+                    <div className="space-y-6 max-w-2xl">
+                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white border-b border-gray-200 dark:border-slate-700 pb-4 flex items-center gap-2">
+                            <Mail className="w-6 h-6 text-orange-500" />
+                            SMTP Email Configuration
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">
+                            Configure an SMTP server to send reminder emails. This works as an alternative to Office 365 email.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">SMTP Host</label>
+                                <input className="w-full mt-1 px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
+                                    placeholder="smtp.office365.com or smtp.gmail.com"
+                                    value={localSettings.smtp.host}
+                                    onChange={e => setLocalSettings(prev => ({ ...prev, smtp: { ...prev.smtp, host: e.target.value } }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Port</label>
+                                <input type="number" className="w-full mt-1 px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
+                                    value={localSettings.smtp.port}
+                                    onChange={e => setLocalSettings(prev => ({ ...prev, smtp: { ...prev.smtp, port: parseInt(e.target.value) || 587 } }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Encryption</label>
+                                <select className="w-full mt-1 px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
+                                    value={localSettings.smtp.encryption}
+                                    onChange={e => setLocalSettings(prev => ({ ...prev, smtp: { ...prev.smtp, encryption: e.target.value as any } }))}
+                                >
+                                    <option value="tls">STARTTLS (Port 587)</option>
+                                    <option value="ssl">SSL/TLS (Port 465)</option>
+                                    <option value="none">None (Port 25)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Username / Email</label>
+                                <input className="w-full mt-1 px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
+                                    placeholder="user@yourdomain.com"
+                                    value={localSettings.smtp.username}
+                                    onChange={e => setLocalSettings(prev => ({ ...prev, smtp: { ...prev.smtp, username: e.target.value } }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Password</label>
+                                <input type="password" className="w-full mt-1 px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
+                                    value={localSettings.smtp.password}
+                                    onChange={e => setLocalSettings(prev => ({ ...prev, smtp: { ...prev.smtp, password: e.target.value } }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">From Email</label>
+                                <input className="w-full mt-1 px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
+                                    placeholder="noreply@yourdomain.com"
+                                    value={localSettings.smtp.fromEmail}
+                                    onChange={e => setLocalSettings(prev => ({ ...prev, smtp: { ...prev.smtp, fromEmail: e.target.value } }))}
+                                />
+                                <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Defaults to username if left empty</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">From Name</label>
+                                <input className="w-full mt-1 px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
+                                    placeholder="SmartRecur"
+                                    value={localSettings.smtp.fromName}
+                                    onChange={e => setLocalSettings(prev => ({ ...prev, smtp: { ...prev.smtp, fromName: e.target.value } }))}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-gray-100 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-3 h-3 rounded-full ${integrationStatus.smtp?.isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`}></div>
+                                <div>
+                                    <p className="font-bold text-sm text-gray-800 dark:text-white">{integrationStatus.smtp?.isConnected ? 'Connected' : 'Not Connected'}</p>
+                                    {integrationStatus.smtp?.message && (
+                                        <p className="text-xs text-gray-500">{integrationStatus.smtp.message}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <button onClick={() => testIntegration('smtp')} disabled={testingIntegration === 'smtp'} className="bg-orange-600 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+                                {testingIntegration === 'smtp' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                Test Connection
+                            </button>
+                        </div>
+
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-700 dark:text-blue-300">
+                            <p className="font-bold mb-1">Common SMTP Settings:</p>
+                            <ul className="list-disc list-inside space-y-1 text-xs">
+                                <li><strong>Office 365:</strong> smtp.office365.com, Port 587, STARTTLS</li>
+                                <li><strong>Gmail:</strong> smtp.gmail.com, Port 587, STARTTLS (use App Password)</li>
+                                <li><strong>Custom:</strong> Check with your hosting provider</li>
+                            </ul>
+                        </div>
                     </div>
                 )}
 
@@ -923,31 +1090,106 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {/* Global Notifications Tab (Fallback) */}
                 {activeTab === 'NOTIFICATIONS' && (
                     <div className="space-y-6 max-w-3xl">
-                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white border-b border-gray-200 dark:border-slate-700 pb-4">Global Email Default</h3>
-                        <p className="text-sm text-gray-600 dark:text-slate-400">This template is used if a specific service does not have its own template.</p>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Subject</label>
-                                <input
-                                    className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
-                                    value={localSettings.templates.reminder.subject}
-                                    onChange={e => setLocalSettings({
-                                        ...localSettings,
-                                        templates: { ...localSettings.templates, reminder: { ...localSettings.templates.reminder, subject: e.target.value } }
-                                    })}
-                                />
+                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white border-b border-gray-200 dark:border-slate-700 pb-4">Email & Reminders</h3>
+
+                        {/* Reminder Frequency */}
+                        <div className="bg-gray-50 dark:bg-slate-800 p-5 rounded-xl border border-gray-200 dark:border-slate-700">
+                            <h4 className="font-bold text-gray-800 dark:text-white mb-1">Reminder Schedule</h4>
+                            <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Configure how many days before an appointment a reminder email is sent. Add multiple to send reminders at different intervals.</p>
+
+                            <div className="flex flex-wrap gap-2 mb-4">
+                                {localSettings.reminders.days
+                                    .sort((a, b) => b - a)
+                                    .map(day => (
+                                    <span key={day} className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-medium border border-primary-200 dark:border-primary-800">
+                                        {day} {day === 1 ? 'day' : 'days'} before
+                                        <button
+                                            onClick={() => setLocalSettings({
+                                                ...localSettings,
+                                                reminders: { ...localSettings.reminders, days: localSettings.reminders.days.filter(d => d !== day) }
+                                            })}
+                                            className="text-primary-500 hover:text-red-500 transition-colors"
+                                        >
+                                            <XCircle className="w-4 h-4" />
+                                        </button>
+                                    </span>
+                                ))}
+                                {localSettings.reminders.days.length === 0 && (
+                                    <span className="text-sm text-gray-400 dark:text-slate-500 italic">No reminders configured</span>
+                                )}
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Body</label>
-                                <textarea
-                                    className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg font-mono text-sm h-40 text-gray-900 dark:text-white"
-                                    value={localSettings.templates.reminder.body}
-                                    onChange={e => setLocalSettings({
+
+                            <div className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                    <label className="text-xs font-bold text-gray-500 dark:text-slate-500 uppercase">Days before appointment</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="90"
+                                        id="newReminderDay"
+                                        className="w-full mt-1 px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white"
+                                        placeholder="e.g. 7"
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const input = document.getElementById('newReminderDay') as HTMLInputElement;
+                                        const val = parseInt(input.value);
+                                        if (!isNaN(val) && val >= 0 && val <= 90 && !localSettings.reminders.days.includes(val)) {
+                                            setLocalSettings({
+                                                ...localSettings,
+                                                reminders: { ...localSettings.reminders, days: [...localSettings.reminders.days, val] }
+                                            });
+                                            input.value = '';
+                                        }
+                                    }}
+                                    className="bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700 h-[42px] text-sm font-medium"
+                                >
+                                    Add
+                                </button>
+                            </div>
+
+                            <div className="mt-3 flex gap-2">
+                                <button
+                                    onClick={() => setLocalSettings({
                                         ...localSettings,
-                                        templates: { ...localSettings.templates, reminder: { ...localSettings.templates.reminder, body: e.target.value } }
+                                        reminders: { ...localSettings.reminders, days: [14, 7, 1] }
                                     })}
-                                />
-                                <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Variables: {'{customer_name}, {service_name}, {date}, {company_name}, {tech_name}, {link}'}</p>
+                                    className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                                >
+                                    Reset to default (14, 7, 1 days)
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Email Template */}
+                        <div className="bg-gray-50 dark:bg-slate-800 p-5 rounded-xl border border-gray-200 dark:border-slate-700">
+                            <h4 className="font-bold text-gray-800 dark:text-white mb-1">Global Email Template</h4>
+                            <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">This template is used if a specific service does not have its own template.</p>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Subject</label>
+                                    <input
+                                        className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white"
+                                        value={localSettings.templates.reminder.subject}
+                                        onChange={e => setLocalSettings({
+                                            ...localSettings,
+                                            templates: { ...localSettings.templates, reminder: { ...localSettings.templates.reminder, subject: e.target.value } }
+                                        })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Body</label>
+                                    <textarea
+                                        className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg font-mono text-sm h-40 text-gray-900 dark:text-white"
+                                        value={localSettings.templates.reminder.body}
+                                        onChange={e => setLocalSettings({
+                                            ...localSettings,
+                                            templates: { ...localSettings.templates, reminder: { ...localSettings.templates.reminder, body: e.target.value } }
+                                        })}
+                                    />
+                                    <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Variables: {'{customer_name}, {service_name}, {date}, {company_name}, {tech_name}, {link}'}</p>
+                                </div>
                             </div>
                         </div>
                     </div>

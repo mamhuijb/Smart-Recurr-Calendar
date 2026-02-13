@@ -76,12 +76,74 @@ class Office365Integration {
         return [true, "Connected as $email"];
     }
 
-    public static function getCalendarEvents(array $config): array {
+    public static function getCalendarEvents(array $config, string $calendarId = ''): array {
         $token = $config['accessToken'] ?? '';
         if (!$token) return [];
 
-        $result = self::httpGet(self::$graphUrl . '/me/calendar/events?$top=50&$orderby=start/dateTime', $token);
+        $endpoint = $calendarId
+            ? self::$graphUrl . "/me/calendars/{$calendarId}/events?\$top=50&\$orderby=start/dateTime"
+            : self::$graphUrl . '/me/calendar/events?$top=50&$orderby=start/dateTime';
+        $result = self::httpGet($endpoint, $token);
         return $result['value'] ?? [];
+    }
+
+    /**
+     * List available calendars for the connected user.
+     */
+    public static function getCalendars(array $config): array {
+        $token = $config['accessToken'] ?? '';
+        if (!$token) return [];
+
+        $result = self::httpGet(self::$graphUrl . '/me/calendars', $token);
+        return $result['value'] ?? [];
+    }
+
+    /**
+     * Create a calendar event in Office 365.
+     */
+    public static function createCalendarEvent(array $config, array $event, string $calendarId = ''): array {
+        $token = $config['accessToken'] ?? '';
+        if (!$token) return ['success' => false, 'error' => 'Not connected to Office 365'];
+
+        $endpoint = $calendarId
+            ? self::$graphUrl . "/me/calendars/{$calendarId}/events"
+            : self::$graphUrl . '/me/calendar/events';
+
+        $result = self::httpPostJson($endpoint, $event, $token);
+        if (isset($result['id'])) {
+            return ['success' => true, 'eventId' => $result['id']];
+        }
+        return ['success' => false, 'error' => $result['error']['message'] ?? 'Failed to create event'];
+    }
+
+    /**
+     * Send an email via Microsoft Graph API.
+     */
+    public static function sendMail(array $config, string $to, string $subject, string $body): array {
+        $token = $config['accessToken'] ?? '';
+        if (!$token) return ['success' => false, 'error' => 'Not connected to Office 365'];
+
+        $mailData = [
+            'message' => [
+                'subject' => $subject,
+                'body'    => [
+                    'contentType' => 'Text',
+                    'content'     => $body,
+                ],
+                'toRecipients' => [
+                    ['emailAddress' => ['address' => $to]],
+                ],
+            ],
+            'saveToSentItems' => true,
+        ];
+
+        $result = self::httpPostJson(self::$graphUrl . '/me/sendMail', $mailData, $token);
+
+        // sendMail returns 202 with no body on success
+        if (empty($result) || !isset($result['error'])) {
+            return ['success' => true];
+        }
+        return ['success' => false, 'error' => $result['error']['message'] ?? 'Send failed'];
     }
 
     // ── HTTP helpers ────────────────────────────────────────
@@ -109,6 +171,34 @@ class Office365Integration {
             return $decoded ?: ['error' => ['message' => "HTTP $code"]];
         }
         return json_decode($body ?: '{}', true) ?: [];
+    }
+
+    private static function httpPostJson(string $url, array $data, string $token): array {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($data),
+            CURLOPT_HTTPHEADER     => [
+                "Authorization: Bearer $token",
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+            CURLOPT_TIMEOUT => 15,
+        ]);
+        $result = curl_exec($ch);
+        if ($result === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            return ['error' => ['message' => "Connection failed: $err"]];
+        }
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        // 202 = accepted (sendMail), 201 = created (event)
+        if ($code >= 200 && $code < 300 && empty($result)) {
+            return [];
+        }
+        return json_decode($result ?: '{}', true) ?: [];
     }
 
     private static function httpPost(string $url, array $data, string $contentType = 'application/json'): array {

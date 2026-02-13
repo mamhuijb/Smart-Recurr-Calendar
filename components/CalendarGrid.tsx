@@ -14,21 +14,19 @@ interface CalendarGridProps {
   onDayClick: (date: Date) => void;
 }
 
-export const CalendarGrid: React.FC<CalendarGridProps> = ({ 
-  events, 
-  technicians, 
-  displayDate, 
+export const CalendarGrid: React.FC<CalendarGridProps> = ({
+  events,
+  technicians,
+  displayDate,
   holidays,
   manualClosures = [],
   businessHours = { start: '09:00', end: '17:00', closedDays: [0] },
-  onPrevMonth, 
-  onNextMonth, 
-  onDayClick 
+  onPrevMonth,
+  onNextMonth,
+  onDayClick
 }) => {
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year: number, month: number) => {
-      // JS getDay(): 0=Sun, 1=Mon ... 6=Sat
-      // We want Mon=0 ... Sun=6
       const day = new Date(year, month, 1).getDay();
       return (day + 6) % 7;
   };
@@ -38,7 +36,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const month = displayDate.getMonth();
   const daysInMonth = getDaysInMonth(year, month);
   const startDay = getFirstDayOfMonth(year, month);
-  
+
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const padding = Array.from({ length: startDay }, (_, i) => i);
 
@@ -49,8 +47,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
   const checkStatus = (day: number) => {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const jsDay = new Date(year, month, day).getDay(); // 0=Sun
-      
+      const jsDay = new Date(year, month, day).getDay();
+
       const isHoliday = holidays.includes(dateStr);
       const isManualClosed = manualClosures.includes(dateStr);
       const isClosedDay = businessHours.closedDays.includes(jsDay);
@@ -63,39 +61,44 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       return t ? t.color : '#475569';
   }
 
-  // Weekdays header starting Monday
-  const weekDays = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+  // Weekdays header - short on mobile, longer on desktop
+  const weekDaysFull = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+  const weekDaysMobile = ['M', 'D', 'W', 'D', 'V', 'Z', 'Z'];
 
   return (
-    <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-slate-100 capitalize flex items-center gap-3">
+    <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-3 sm:p-4 md:p-6 h-full flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3 sm:mb-6">
+        <h2 className="text-base sm:text-xl font-bold text-slate-100 capitalize flex items-center gap-2 sm:gap-3">
           {displayDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
-          <span className="text-xs bg-slate-800 text-slate-400 px-2 py-1 rounded border border-slate-700 font-normal">
+          <span className="hidden sm:inline text-xs bg-slate-800 text-slate-400 px-2 py-1 rounded border border-slate-700 font-normal">
               {businessHours.start} - {businessHours.end}
           </span>
         </h2>
-        <div className="flex gap-2">
-          <button onClick={onPrevMonth} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
-            <ChevronLeft className="w-5 h-5" />
+        <div className="flex gap-1 sm:gap-2">
+          <button onClick={onPrevMonth} className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
+            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
-          <button onClick={onNextMonth} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
-            <ChevronRight className="w-5 h-5" />
+          <button onClick={onNextMonth} className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
+            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {weekDays.map(d => (
-          <div key={d} className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider py-2">
-            {d}
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1 mb-1 sm:mb-2">
+        {weekDaysFull.map((d, i) => (
+          <div key={d} className="text-center text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider py-1 sm:py-2">
+            <span className="hidden sm:inline">{d}</span>
+            <span className="sm:hidden">{weekDaysMobile[i]}</span>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1 sm:gap-2 flex-1">
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1 md:gap-2 flex-1">
         {padding.map((_, i) => (
-          <div key={`pad-${i}`} className="aspect-square bg-slate-950/50 rounded-lg border border-transparent"></div>
+          <div key={`pad-${i}`} className="min-h-[36px] sm:min-h-[48px] md:aspect-square bg-slate-950/50 rounded sm:rounded-lg border border-transparent"></div>
         ))}
         {days.map(day => {
           const dayEvents = getEventsForDay(day);
@@ -103,57 +106,76 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           const isToday = new Date().toDateString() === currentDayDate.toDateString();
           const { isHoliday, isManualClosed, isClosedDay } = checkStatus(day);
           const isClosed = isHoliday || isManualClosed || isClosedDay;
-          
+
           return (
-            <div 
-              key={day} 
+            <div
+              key={day}
               onClick={() => !isClosed && onDayClick(currentDayDate)}
-              className={`group relative aspect-square p-1 sm:p-2 border rounded-lg flex flex-col items-start transition-all 
-                ${isClosed 
-                    ? 'bg-slate-950/50 border-slate-800 cursor-not-allowed opacity-60' 
+              className={`group relative min-h-[36px] sm:min-h-[48px] md:aspect-square p-0.5 sm:p-1 md:p-2 border rounded sm:rounded-lg flex flex-col items-start transition-all
+                ${isClosed
+                    ? 'bg-slate-950/50 border-slate-800 cursor-not-allowed opacity-60'
                     : 'bg-slate-800 border-slate-700 cursor-pointer hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-900/20'
                 }
-                ${isToday ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-slate-900' : ''}
+                ${isToday ? 'ring-1 sm:ring-2 ring-indigo-500 ring-offset-1 sm:ring-offset-2 ring-offset-slate-900' : ''}
                 ${isClosed ? 'bg-[url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjMGUxNzJhIi8+CjxwYXRoIGQ9Ik0wIDBMNCA0IiBzdHJva2U9IiMxZTI5M2IiIHN0cm9rZS13aWR0aD0iMSIvPgo8L3N2Zz4=")]' : ''}
               `}
             >
               <div className="flex justify-between w-full">
-                  <span className={`text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full ${
+                  <span className={`text-xs sm:text-sm font-medium w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full ${
                     isToday ? 'bg-indigo-600 text-white' : isClosed ? 'text-slate-600' : 'text-slate-300 group-hover:bg-slate-700'
                   }`}>
                     {day}
                   </span>
-                  {isHoliday && <span title="Holiday"><AlertCircle className="w-4 h-4 text-red-500" /></span>}
-                  {(isManualClosed || isClosedDay) && !isHoliday && <span title="Closed"><Lock className="w-3 h-3 text-slate-600" /></span>}
+                  {isHoliday && <span title="Holiday"><AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-red-500" /></span>}
+                  {(isManualClosed || isClosedDay) && !isHoliday && <span title="Closed"><Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-600" /></span>}
               </div>
-              
-              {!isClosed && (
-                  <div className="flex-1 w-full flex flex-col gap-1 mt-1 overflow-hidden">
+
+              {/* Event indicators - dots on mobile, full cards on larger screens */}
+              {!isClosed && dayEvents.length > 0 && (
+                <>
+                  {/* Mobile: colored dots */}
+                  <div className="flex gap-0.5 mt-0.5 flex-wrap sm:hidden">
+                    {dayEvents.slice(0, 4).map(ev => (
+                      <div
+                        key={ev.id}
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: getTechColor(ev.technicianId) }}
+                        title={ev.title}
+                      />
+                    ))}
+                    {dayEvents.length > 4 && (
+                      <span className="text-[8px] text-slate-500">+{dayEvents.length - 4}</span>
+                    )}
+                  </div>
+
+                  {/* Desktop: full event cards */}
+                  <div className="hidden sm:flex flex-1 w-full flex-col gap-0.5 md:gap-1 mt-0.5 md:mt-1 overflow-hidden">
                     {dayEvents.slice(0, 3).map(ev => (
-                    <div 
-                        key={ev.id} 
-                        className="flex items-center gap-1 text-[10px] leading-tight truncate px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 font-medium w-full border-l-2"
+                    <div
+                        key={ev.id}
+                        className="flex items-center gap-0.5 md:gap-1 text-[9px] md:text-[10px] leading-tight truncate px-1 md:px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 font-medium w-full border-l-2"
                         style={{ borderLeftColor: getTechColor(ev.technicianId)}}
                         title={ev.title}
                     >
                         {ev.locationType === 'REMOTE' ? (
-                            <Headset className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                            <Headset className="w-2.5 h-2.5 md:w-3 md:h-3 text-slate-400 flex-shrink-0" />
                         ) : (
-                            <MapPin className="w-3 h-3 text-indigo-400 flex-shrink-0" />
+                            <MapPin className="w-2.5 h-2.5 md:w-3 md:h-3 text-indigo-400 flex-shrink-0" />
                         )}
                         <span className="truncate">{ev.title}</span>
                     </div>
                     ))}
                     {dayEvents.length > 3 && (
-                    <div className="text-[9px] text-slate-500 pl-1">+{dayEvents.length - 3} more</div>
+                    <div className="text-[8px] md:text-[9px] text-slate-500 pl-1">+{dayEvents.length - 3} more</div>
                     )}
-                </div>
+                  </div>
+                </>
               )}
 
-              {/* Hover Plus Icon */}
+              {/* Hover Plus Icon - only on non-touch devices */}
               {!isClosed && (
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-slate-900/60 backdrop-blur-[1px] rounded-lg transition-opacity pointer-events-none">
-                    <Plus className="w-6 h-6 text-indigo-400 drop-shadow-sm" />
+                <div className="absolute inset-0 hidden sm:flex items-center justify-center opacity-0 group-hover:opacity-100 bg-slate-900/60 backdrop-blur-[1px] rounded-lg transition-opacity pointer-events-none">
+                    <Plus className="w-5 h-5 md:w-6 md:h-6 text-indigo-400 drop-shadow-sm" />
                 </div>
               )}
             </div>

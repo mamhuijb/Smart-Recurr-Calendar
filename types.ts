@@ -92,30 +92,42 @@ export interface SecuritySettings {
     twoFactorSecret: string; // In production, this would be encrypted
 }
 
+export interface SmtpConfig {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    fromEmail: string;
+    fromName: string;
+    encryption: 'tls' | 'ssl' | 'none';
+}
+
 export interface AppSettings {
   branding: BrandingSettings;
-  security: SecuritySettings; // New
+  security: SecuritySettings;
   office365: {
     clientId: string;
     tenantId: string;
     auth: OAuthState;
-    selectedCalendarId?: string; 
+    selectedCalendarId?: string;
+    calendarSyncEnabled?: boolean;
   };
+  smtp: SmtpConfig;
   integrations: {
     syncroApiKey: string;
     syncroSubdomain: string;
-    invoiceNinja: IntegrationConfig; // New
-    zoho: IntegrationConfig; // New
+    invoiceNinja: IntegrationConfig;
+    zoho: IntegrationConfig;
   };
   reminders: {
-    days: number[]; 
+    days: number[];
   };
   templates: {
-    reminder: EmailTemplate; // Global default
+    reminder: EmailTemplate;
   };
-  businessHours: BusinessHours; 
-  manualClosures: string[]; 
-  holidays: string[]; 
+  businessHours: BusinessHours;
+  manualClosures: string[];
+  holidays: string[];
 }
 
 export interface Reminder {
@@ -143,10 +155,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
       twoFactorEnabled: false,
       twoFactorSecret: 'JBSWY3DPEHPK3PXP' // Mock Base32 secret
   },
-  office365: { 
-    clientId: '', 
-    tenantId: '', 
-    auth: { isConnected: false } 
+  office365: {
+    clientId: '',
+    tenantId: '',
+    auth: { isConnected: false },
+    calendarSyncEnabled: false,
+  },
+  smtp: {
+    host: '',
+    port: 587,
+    username: '',
+    password: '',
+    fromEmail: '',
+    fromName: 'SmartRecur',
+    encryption: 'tls',
   },
   integrations: { 
       syncroApiKey: '', 

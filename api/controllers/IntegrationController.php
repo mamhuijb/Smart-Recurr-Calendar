@@ -4,6 +4,7 @@ require_once __DIR__ . '/../integrations/Office365.php';
 require_once __DIR__ . '/../integrations/SyncroMSP.php';
 require_once __DIR__ . '/../integrations/InvoiceNinja.php';
 require_once __DIR__ . '/../integrations/Zoho.php';
+require_once __DIR__ . '/../helpers/SmtpMailer.php';
 
 class IntegrationController {
 
@@ -41,7 +42,7 @@ class IntegrationController {
     public static function saveConfig(string $type, array $body): void {
         AuthMiddleware::verify();
 
-        $valid = ['office365', 'syncro', 'invoiceninja', 'zoho'];
+        $valid = ['office365', 'syncro', 'invoiceninja', 'zoho', 'smtp'];
         if (!in_array($type, $valid, true)) {
             Response::error('Unknown integration type', 400);
         }
@@ -96,6 +97,9 @@ class IntegrationController {
                 break;
             case 'zoho':
                 [$connected, $message] = ZohoIntegration::test($config);
+                break;
+            case 'smtp':
+                [$connected, $message] = SmtpMailer::test($config);
                 break;
             default:
                 Response::error('Unknown integration', 400);
@@ -206,6 +210,62 @@ class IntegrationController {
         Response::json(['customers' => $customers]);
     }
 
+    /**
+     * POST /integrations/email/send — send an email via configured method (SMTP or Office 365).
+     */
+    public static function sendEmail(array $body): void {
+        AuthMiddleware::verify();
+
+        $to      = $body['to'] ?? '';
+        $subject = $body['subject'] ?? '';
+        $emailBody = $body['body'] ?? '';
+
+        if (!$to || !$subject || !$emailBody) {
+            Response::error('to, subject, and body are required', 400);
+        }
+
+        // Validate email format
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            Response::error('Invalid email address', 400);
+        }
+
+        $db = Database::getInstance();
+
+        // Check which email method is configured
+        // Priority: SMTP > Office 365 > fail
+        $smtpStmt = $db->prepare('SELECT config FROM integration_configs WHERE id = ?');
+        $smtpStmt->execute(['smtp']);
+        $smtpRow = $smtpStmt->fetch();
+        $smtpConfig = $smtpRow ? json_decode($smtpRow['config'], true) : [];
+
+        if (!empty($smtpConfig['host']) && !empty($smtpConfig['username'])) {
+            // Use SMTP
+            $result = SmtpMailer::send($smtpConfig, $to, $subject, $emailBody);
+            if ($result['success']) {
+                Response::json(['success' => true, 'method' => 'smtp']);
+            } else {
+                Response::error('SMTP: ' . $result['error'], 500);
+            }
+        }
+
+        // Try Office 365
+        $o365Stmt = $db->prepare('SELECT config FROM integration_configs WHERE id = ?');
+        $o365Stmt->execute(['office365']);
+        $o365Row = $o365Stmt->fetch();
+        $o365Config = $o365Row ? json_decode($o365Row['config'], true) : [];
+
+        if (!empty($o365Config['accessToken'])) {
+            $result = Office365Integration::sendMail($o365Config, $to, $subject, $emailBody);
+            if ($result['success']) {
+                Response::json(['success' => true, 'method' => 'office365']);
+            } else {
+                Response::error('Office 365: ' . ($result['error'] ?? 'Send failed'), 500);
+            }
+        }
+
+        Response::error('No email method configured. Set up SMTP or connect Office 365.', 400);
+    }
+
     public static function syncroCreateTicket(array $body): void {
         AuthMiddleware::verify();
         $db = Database::getInstance();
@@ -216,5 +276,58 @@ class IntegrationController {
 
         $result = SyncroMSPIntegration::createTicket($config, $body);
         Response::json($result);
+    }
+
+    // ── Office 365 Calendar Sync ─────────────────────────────
+
+    /**
+     * GET /integrations/office365/calendars — list user's calendars.
+     */
+    public static function office365Calendars(): void {
+        AuthMiddleware::verify();
+        $db = Database::getInstance();
+
+        $stmt = $db->prepare('SELECT config FROM integration_configs WHERE id = ?');
+        $stmt->execute(['office365']);
+        $config = json_decode($stmt->fetch()['config'] ?? '{}', true);
+
+        $calendars = Office365Integration::getCalendars($config);
+        Response::json(['calendars' => $calendars]);
+    }
+
+    /**
+     * POST /integrations/office365/calendar-event — create a calendar event in Office 365.
+     */
+    public static function office365CreateEvent(array $body): void {
+        AuthMiddleware::verify();
+        $db = Database::getInstance();
+
+        $stmt = $db->prepare('SELECT config FROM integration_configs WHERE id = ?');
+        $stmt->execute(['office365']);
+        $config = json_decode($stmt->fetch()['config'] ?? '{}', true);
+
+        $calendarId = $body['calendarId'] ?? '';
+        $event = [
+            'subject' => $body['subject'] ?? 'SmartRecur Appointment',
+            'body' => [
+                'contentType' => 'Text',
+                'content' => $body['description'] ?? '',
+            ],
+            'start' => [
+                'dateTime' => $body['startDateTime'] ?? '',
+                'timeZone' => $body['timeZone'] ?? 'Europe/Amsterdam',
+            ],
+            'end' => [
+                'dateTime' => $body['endDateTime'] ?? '',
+                'timeZone' => $body['timeZone'] ?? 'Europe/Amsterdam',
+            ],
+        ];
+
+        $result = Office365Integration::createCalendarEvent($config, $event, $calendarId);
+        if ($result['success']) {
+            Response::json($result);
+        } else {
+            Response::error($result['error'], 500);
+        }
     }
 }

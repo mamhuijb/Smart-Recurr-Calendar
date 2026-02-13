@@ -6,12 +6,23 @@
 
 const API_BASE = '/api';
 const TOKEN_KEY = 'sr_token';
+const SESSION_TIMESTAMP_KEY = 'sr_session_ts';
+const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 1 day
 
 class ApiClient {
   private token: string | null = null;
 
   constructor() {
     this.token = localStorage.getItem(TOKEN_KEY);
+
+    // Check if session has expired on load
+    if (this.token) {
+      const ts = parseInt(localStorage.getItem(SESSION_TIMESTAMP_KEY) || '0', 10);
+      if (ts && Date.now() - ts > SESSION_MAX_AGE_MS) {
+        this.clearToken();
+        window.location.reload();
+      }
+    }
   }
 
   // ── Core request method ─────────────────────────────────
@@ -37,6 +48,11 @@ class ApiClient {
       throw new Error('Session expired');
     }
 
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(`Server returned non-JSON response (${res.status}). Check API routing.`);
+    }
+
     const data = await res.json();
 
     if (!res.ok) {
@@ -51,11 +67,13 @@ class ApiClient {
   setToken(token: string): void {
     this.token = token;
     localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(SESSION_TIMESTAMP_KEY, String(Date.now()));
   }
 
   clearToken(): void {
     this.token = null;
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(SESSION_TIMESTAMP_KEY);
   }
 
   hasToken(): boolean {
@@ -204,6 +222,22 @@ class ApiClient {
 
   syncroCreateTicket(data: { customerId: string; subject: string; description: string }) {
     return this.request<{ ticketId: string }>('POST', '/integrations/syncro/tickets', data);
+  }
+
+  // ── Email ──────────────────────────────────────────────────
+
+  sendEmail(data: { to: string; subject: string; body: string }) {
+    return this.request<{ success: boolean; method: string }>('POST', '/integrations/email/send', data);
+  }
+
+  // ── Office 365 Calendar ───────────────────────────────────
+
+  getOffice365Calendars() {
+    return this.request<{ calendars: Array<{ id: string; name: string }> }>('GET', '/integrations/office365/calendars');
+  }
+
+  createOffice365Event(data: { calendarId?: string; subject: string; description: string; startDateTime: string; endDateTime: string; timeZone?: string }) {
+    return this.request<{ success: boolean; eventId?: string }>('POST', '/integrations/office365/calendar-event', data);
   }
 }
 

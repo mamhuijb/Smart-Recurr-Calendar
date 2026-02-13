@@ -114,6 +114,9 @@ route('GET',  '/integrations/office365/auth-url',  fn($b, $p) => IntegrationCont
 route('GET',  '/integrations/office365/callback',  fn($b, $p) => IntegrationController::office365Callback());
 route('GET',  '/integrations/syncro/customers',    fn($b, $p) => IntegrationController::syncroCustomers());
 route('POST', '/integrations/syncro/tickets',      fn($b, $p) => IntegrationController::syncroCreateTicket($b));
+route('POST', '/integrations/email/send',          fn($b, $p) => IntegrationController::sendEmail($b));
+route('GET',  '/integrations/office365/calendars',  fn($b, $p) => IntegrationController::office365Calendars());
+route('POST', '/integrations/office365/calendar-event', fn($b, $p) => IntegrationController::office365CreateEvent($b));
 
 // ── 404 ─────────────────────────────────────────────────────
 if (!$matched) {

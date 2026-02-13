@@ -4,7 +4,8 @@
 RewriteEngine On
 
 # ─── API routing ─────────────────────────────────────────────
-# All /api/* requests go to the PHP router
+# All /api/* requests go to the PHP router (all HTTP methods)
+RewriteCond %{REQUEST_URI} ^/api/
 RewriteRule ^api/(.*)$ api/index.php [QSA,L]
 
 # ─── Static frontend assets from dist/ ──────────────────────
@@ -44,7 +45,9 @@ RewriteRule ^(.*)$ dist/index.html [L]
 </IfModule>
 
 # ─── Block access to sensitive files ─────────────────────────
-<FilesMatch "\.(env|sql|md|json|lock|log|sh|yml|yaml|xml|ini|bak|dist)$">
+# Note: API routes are already handled by RewriteRule above (L flag),
+# so this only applies to direct file access outside the API.
+<FilesMatch "\.(env|sql|md|lock|log|sh|yml|yaml|ini|bak|dist)$">
     Require all denied
 </FilesMatch>
 

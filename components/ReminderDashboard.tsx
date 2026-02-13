@@ -111,7 +111,7 @@ export const ReminderDashboard: React.FC<ReminderDashboardProps> = ({
 
               <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-wider">
                   <Mail className="w-3 h-3" />
-                  Sent via {settings.office365.auth.isConnected ? 'Office 365' : 'System Mail'}
+                  Via {settings.smtp?.host ? 'SMTP' : settings.office365.auth.isConnected ? 'Office 365' : 'Not configured'}
               </div>
             </div>
           ))
