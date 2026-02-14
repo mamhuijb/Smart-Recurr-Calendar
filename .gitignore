@@ -8,9 +8,12 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
 dist-ssr
 *.local
+
+# Deployment artifacts (not needed in git — dist/ IS committed)
+smartrecur-deploy.tar.gz
+smartrecur-deploy.b64
 
 # Environment (contains secrets)
 .env

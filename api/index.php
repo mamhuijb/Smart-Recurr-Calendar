@@ -21,7 +21,7 @@ if ($allowedOrigin === '*') {
     header('Access-Control-Allow-Origin: ' . $allowedOrigin);
 }
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-HTTP-Method-Override');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -40,6 +40,15 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $uri = preg_replace('#^/api#', '', $uri);
 $uri = rtrim($uri, '/') ?: '/';
 $method = $_SERVER['REQUEST_METHOD'];
+
+// Method override: POST + X-HTTP-Method-Override header → treat as PUT/DELETE
+// This bypasses ModSecurity/WAF rules that block PUT/DELETE on Plesk/CloudLinux
+if ($method === 'POST' && !empty($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'])) {
+    $override = strtoupper($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE']);
+    if (in_array($override, ['PUT', 'DELETE', 'PATCH'], true)) {
+        $method = $override;
+    }
+}
 
 // Request body
 $body = json_decode(file_get_contents('php://input'), true) ?? [];

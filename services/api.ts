@@ -36,8 +36,16 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
+    // Method override: send PUT/DELETE as POST with X-HTTP-Method-Override header.
+    // This bypasses ModSecurity/WAF on Plesk/CloudLinux that blocks PUT/DELETE with 403.
+    let actualMethod = method;
+    if (method === 'PUT' || method === 'DELETE') {
+      actualMethod = 'POST';
+      headers['X-HTTP-Method-Override'] = method;
+    }
+
     const res = await fetch(`${API_BASE}${path}`, {
-      method,
+      method: actualMethod,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
