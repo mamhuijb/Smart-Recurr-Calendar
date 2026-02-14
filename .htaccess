@@ -19,7 +19,8 @@ DirectoryIndex app.html
 
 # ─── API routing ─────────────────────────────────────────────
 # All /api/* requests go to the PHP router (all HTTP methods)
-RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+# [END] (not [L]) stops all rewrite processing — prevents LiteSpeed context issues
+RewriteRule ^api/(.*)$ api/index.php [QSA,END]
 
 # ─── Block dev template ─────────────────────────────────────────
 # Redirect index.html to app.html (index.html is the Vite dev template)
