@@ -13,22 +13,23 @@ RewriteEngine On
     SecFilterScanPOST Off
 </IfModule>
 
+# ─── Default document ──────────────────────────────────────────
+# Serve app.html (production build) instead of index.html (dev template)
+DirectoryIndex app.html
+
 # ─── API routing ─────────────────────────────────────────────
 # All /api/* requests go to the PHP router (all HTTP methods)
 RewriteRule ^api/(.*)$ api/index.php [QSA,L]
 
-# ─── Serve built frontend from dist/ ─────────────────────────
-# Vite outputs to dist/ — map root requests to dist/ files.
-# /assets/xxx.js  →  dist/assets/xxx.js
-# /index.html     →  dist/index.html
-RewriteCond %{DOCUMENT_ROOT}/dist%{REQUEST_URI} -f
-RewriteRule ^(.+)$ dist/$1 [L]
+# ─── Block dev template ─────────────────────────────────────────
+# Redirect index.html to app.html (index.html is the Vite dev template)
+RewriteRule ^index\.html$ app.html [L,R=302]
 
 # ─── SPA fallback ────────────────────────────────────────────
-# Everything else (non-file, non-dir, non-api) → dist/index.html
+# Non-file, non-dir, non-api requests → app.html (production SPA entry)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ dist/index.html [L]
+RewriteRule ^(.*)$ app.html [L]
 
 # ─── Security headers ────────────────────────────────────────
 <IfModule mod_headers.c>
@@ -64,4 +65,4 @@ RewriteRule ^(.*)$ dist/index.html [L]
 RewriteRule (^|/)\.(?!htaccess|well-known) - [F]
 
 # Block direct access to source/config directories
-RewriteRule ^(database|node_modules|components|services|utils)/ - [F]
+RewriteRule ^(database|node_modules|components|services|utils|dist|src)/ - [F]

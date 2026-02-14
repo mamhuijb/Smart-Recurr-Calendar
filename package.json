@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && rm -rf assets && cp -r dist/assets assets && cp dist/index.html app.html",
     "php": "php -S localhost:8000 -t . api/index.php"
   },
   "dependencies": {
