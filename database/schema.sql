@@ -28,7 +28,7 @@ ON DUPLICATE KEY UPDATE username = username;
 -- ============================================================
 CREATE TABLE IF NOT EXISTS customers (
     id VARCHAR(36) PRIMARY KEY,
-    company VARCHAR(255) NOT NULL,
+    company VARCHAR(255) NOT NULL DEFAULT '',
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) DEFAULT '',
     phone VARCHAR(50) DEFAULT '',

@@ -275,13 +275,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
 
     const handleAddCustomer = async () => {
-        if (!newCustomer.company || !newCustomer.name) {
-            alert("Company and Contact Name are required.");
+        if (!newCustomer.name) {
+            alert("Contact Name is required.");
             return;
         }
         const c: Customer = {
             id: crypto.randomUUID(),
-            company: newCustomer.company!,
+            company: newCustomer.company || '',
             name: newCustomer.name!,
             email: newCustomer.email || '',
             phone: newCustomer.phone || '',
@@ -1272,9 +1272,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <h4 className="font-bold text-gray-700 dark:text-slate-200 mb-3 text-sm uppercase">Add New Customer</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500 dark:text-slate-500 uppercase">Company Name *</label>
+                                    <label className="text-xs font-bold text-gray-500 dark:text-slate-500 uppercase">Company Name</label>
                                     <input className="w-full mt-1 px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white text-sm"
-                                        value={newCustomer.company} onChange={e => setNewCustomer({ ...newCustomer, company: e.target.value })} placeholder="Tech Corp BV" />
+                                        value={newCustomer.company} onChange={e => setNewCustomer({ ...newCustomer, company: e.target.value })} placeholder="Tech Corp BV (leave empty for private)" />
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-gray-500 dark:text-slate-500 uppercase">Contact Person *</label>
@@ -1319,7 +1319,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-slate-700">
                                     {customers.map(c => (
                                         <tr key={c.id}>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{c.company}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{c.company || <span className="text-gray-400 dark:text-slate-500 italic">Private</span>}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
                                                 <div>{c.name}</div>
                                                 <div className="text-xs opacity-75">{c.email}</div>

@@ -17,13 +17,15 @@ RewriteEngine On
 # All /api/* requests go to the PHP router (all HTTP methods)
 RewriteRule ^api/(.*)$ api/index.php [QSA,L]
 
-# ─── Static frontend assets from dist/ ──────────────────────
-# If a file exists inside dist/, serve it directly
-RewriteCond %{DOCUMENT_ROOT}/dist/%{REQUEST_URI} -f
-RewriteRule ^(.*)$ dist/$1 [L]
+# ─── Serve built frontend from dist/ ─────────────────────────
+# Vite outputs to dist/ — map root requests to dist/ files.
+# /assets/xxx.js  →  dist/assets/xxx.js
+# /index.html     →  dist/index.html
+RewriteCond %{DOCUMENT_ROOT}/dist%{REQUEST_URI} -f
+RewriteRule ^(.+)$ dist/$1 [L]
 
 # ─── SPA fallback ────────────────────────────────────────────
-# Everything else goes to dist/index.html (React Router)
+# Everything else (non-file, non-dir, non-api) → dist/index.html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ dist/index.html [L]
@@ -61,5 +63,5 @@ RewriteRule ^(.*)$ dist/index.html [L]
 # Block hidden files/dirs (except .htaccess and .well-known)
 RewriteRule (^|/)\.(?!htaccess|well-known) - [F]
 
-# Block direct PHP access in subdirectories
+# Block direct access to source/config directories
 RewriteRule ^(database|node_modules|components|services|utils)/ - [F]
