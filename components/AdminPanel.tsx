@@ -47,7 +47,55 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     // Fetch integration status from API on mount
     useEffect(() => {
         api.getIntegrationStatus().then(res => {
-            setIntegrationStatus(res.integrations || {});
+            const integrations = res.integrations || {};
+            setIntegrationStatus(integrations);
+
+            // Populate localSettings with saved integration configs from DB
+            setLocalSettings(prev => {
+                const smtpCfg = integrations.smtp?.config || {};
+                const o365Cfg = integrations.office365?.config || {};
+                const syncroCfg = integrations.syncro?.config || {};
+                const invoiceCfg = integrations.invoiceninja?.config || {};
+                const zohoCfg = integrations.zoho?.config || {};
+
+                return {
+                    ...prev,
+                    smtp: {
+                        host: smtpCfg.host || prev.smtp.host,
+                        port: smtpCfg.port || prev.smtp.port,
+                        username: smtpCfg.username || prev.smtp.username,
+                        password: '', // Never populate masked password — user re-enters or leaves blank to keep existing
+                        fromEmail: smtpCfg.fromEmail || prev.smtp.fromEmail,
+                        fromName: smtpCfg.fromName || prev.smtp.fromName,
+                        encryption: smtpCfg.encryption || prev.smtp.encryption,
+                    },
+                    office365: {
+                        ...prev.office365,
+                        clientId: o365Cfg.clientId || prev.office365.clientId,
+                        tenantId: o365Cfg.tenantId || prev.office365.tenantId,
+                        auth: {
+                            isConnected: integrations.office365?.isConnected || false,
+                            userEmail: o365Cfg.userEmail || prev.office365.auth.userEmail,
+                        },
+                    },
+                    integrations: {
+                        ...prev.integrations,
+                        syncroApiKey: syncroCfg.apiKey === '••••••••' ? '' : (syncroCfg.apiKey || prev.integrations.syncroApiKey),
+                        syncroSubdomain: syncroCfg.subdomain || prev.integrations.syncroSubdomain,
+                        invoiceNinja: {
+                            ...prev.integrations.invoiceNinja,
+                            apiKey: invoiceCfg.apiKey === '••••••••' ? '' : (invoiceCfg.apiKey || prev.integrations.invoiceNinja.apiKey),
+                            endpoint: invoiceCfg.endpoint || prev.integrations.invoiceNinja.endpoint,
+                        },
+                        zoho: {
+                            ...prev.integrations.zoho,
+                            apiKey: zohoCfg.apiKey === '••••••••' ? '' : (zohoCfg.apiKey || prev.integrations.zoho.apiKey),
+                            apiSecret: zohoCfg.apiSecret === '••••••••' ? '' : (zohoCfg.apiSecret || prev.integrations.zoho.apiSecret),
+                            endpoint: zohoCfg.endpoint || prev.integrations.zoho.endpoint,
+                        },
+                    },
+                };
+            });
         }).catch(() => {});
     }, []);
     const [newService, setNewService] = useState<Partial<Service>>({ name: '', type: 'RECURRING', color: '#4F46E5', createTicket: true, defaultLocation: 'ON_SITE' });
@@ -216,15 +264,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     tenantId: localSettings.office365.tenantId,
                 });
             } else if (type === 'smtp') {
-                await api.saveIntegrationConfig('smtp', {
+                const smtpSave: Record<string, any> = {
                     host: localSettings.smtp.host,
                     port: localSettings.smtp.port,
                     username: localSettings.smtp.username,
-                    password: localSettings.smtp.password,
                     fromEmail: localSettings.smtp.fromEmail,
                     fromName: localSettings.smtp.fromName,
                     encryption: localSettings.smtp.encryption,
-                });
+                };
+                if (localSettings.smtp.password) smtpSave.password = localSettings.smtp.password;
+                await api.saveIntegrationConfig('smtp', smtpSave);
             }
 
             const result = await api.testIntegration(type);
@@ -341,15 +390,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 apiSecret: localSettings.integrations.zoho.apiSecret,
                 endpoint: localSettings.integrations.zoho.endpoint,
             });
-            await api.saveIntegrationConfig('smtp', {
+            const smtpPayload: Record<string, any> = {
                 host: localSettings.smtp.host,
                 port: localSettings.smtp.port,
                 username: localSettings.smtp.username,
-                password: localSettings.smtp.password,
                 fromEmail: localSettings.smtp.fromEmail,
                 fromName: localSettings.smtp.fromName,
                 encryption: localSettings.smtp.encryption,
-            });
+            };
+            // Only send password if user entered a new one (don't overwrite stored password with empty string)
+            if (localSettings.smtp.password) {
+                smtpPayload.password = localSettings.smtp.password;
+            }
+            await api.saveIntegrationConfig('smtp', smtpPayload);
 
             onUpdateSettings(localSettings);
             alert("Configuration saved.");
@@ -949,6 +1002,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div>
                                 <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Password</label>
                                 <input type="password" className="w-full mt-1 px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
+                                    placeholder={integrationStatus.smtp?.isConnected ? '(saved — leave empty to keep)' : ''}
                                     value={localSettings.smtp.password}
                                     onChange={e => setLocalSettings(prev => ({ ...prev, smtp: { ...prev.smtp, password: e.target.value } }))}
                                 />

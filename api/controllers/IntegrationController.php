@@ -30,6 +30,7 @@ class IntegrationController {
             if (isset($item['config']['clientSecret'])) $item['config']['clientSecret'] = $item['config']['clientSecret'] ? '••••••••' : '';
             if (isset($item['config']['apiKey']))        $item['config']['apiKey'] = $item['config']['apiKey'] ? '••••••••' : '';
             if (isset($item['config']['apiSecret']))     $item['config']['apiSecret'] = $item['config']['apiSecret'] ? '••••••••' : '';
+            if (isset($item['config']['password']))      $item['config']['password'] = $item['config']['password'] ? '••••••••' : '';
             if (isset($item['config']['accessToken']))   unset($item['config']['accessToken']);
         }
 
@@ -327,7 +328,7 @@ class IntegrationController {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB');
 
-        $id = UUID::generate();
+        $id = UUID::v4();
         $stmt = $db->prepare('INSERT INTO email_logs (id, recipient, subject, status, method, error) VALUES (?, ?, ?, ?, ?, ?)');
         $stmt->execute([$id, $to, $subject, $status, $method, $error ?: null]);
     }
