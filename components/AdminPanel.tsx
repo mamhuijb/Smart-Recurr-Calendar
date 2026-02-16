@@ -63,6 +63,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const [emailLogs, setEmailLogs] = useState<Array<{ id: string; recipient: string; subject: string; status: string; method: string; error: string | null; created_at: string }>>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
 
+    // Test email
+    const [testEmailAddress, setTestEmailAddress] = useState('');
+    const [sendingTestEmail, setSendingTestEmail] = useState(false);
+    const [testEmailResult, setTestEmailResult] = useState<{ success: boolean; message: string } | null>(null);
+
     // --- REPORTING LOGIC ---
     const reportData = useMemo(() => {
         const currentYear = new Date().getFullYear();
@@ -1296,6 +1301,78 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Variables: {'{customer_name}, {service_name}, {date}, {company_name}, {tech_name}, {link}'}</p>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Send Test Email */}
+                        <div className="bg-gray-50 dark:bg-slate-800 p-5 rounded-xl border border-gray-200 dark:border-slate-700">
+                            <h4 className="font-bold text-gray-800 dark:text-white mb-1 flex items-center gap-2">
+                                <Send className="w-4 h-4 text-green-500" />
+                                Send Test Email
+                            </h4>
+                            <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
+                                Send the global template with sample data to verify your email setup works. Uses your selected outgoing mail method.
+                            </p>
+                            <div className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-bold text-gray-500 dark:text-slate-500 uppercase mb-1">Recipient email</label>
+                                    <input
+                                        type="email"
+                                        className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white"
+                                        placeholder="you@example.com"
+                                        value={testEmailAddress}
+                                        onChange={e => { setTestEmailAddress(e.target.value); setTestEmailResult(null); }}
+                                    />
+                                </div>
+                                <button
+                                    disabled={sendingTestEmail || !testEmailAddress}
+                                    onClick={async () => {
+                                        setSendingTestEmail(true);
+                                        setTestEmailResult(null);
+                                        try {
+                                            // Fill template with sample data
+                                            let subject = localSettings.templates.reminder.subject;
+                                            let body = localSettings.templates.reminder.body;
+                                            const sampleData: Record<string, string> = {
+                                                '{customer_name}': 'Jan de Vries',
+                                                '{service_name}': 'Backup Controle',
+                                                '{date}': new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+                                                '{company_name}': 'SmartRecur',
+                                                '{tech_name}': 'Admin',
+                                                '{location_type}': 'On Site',
+                                                '{link}': 'https://example.com/confirm',
+                                            };
+                                            for (const [key, val] of Object.entries(sampleData)) {
+                                                subject = subject.split(key).join(val);
+                                                body = body.split(key).join(val);
+                                            }
+                                            subject = '[TEST] ' + subject;
+
+                                            const result = await api.sendEmail({ to: testEmailAddress, subject, body });
+                                            setTestEmailResult({ success: true, message: `Test email sent via ${result.method === 'smtp' ? 'SMTP' : 'Office 365'}` });
+                                        } catch (e: any) {
+                                            setTestEmailResult({ success: false, message: e.message || 'Failed to send test email' });
+                                        } finally {
+                                            setSendingTestEmail(false);
+                                        }
+                                    }}
+                                    className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-medium flex items-center gap-2 h-[42px]"
+                                >
+                                    {sendingTestEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                    Send Test
+                                </button>
+                            </div>
+                            {testEmailResult && (
+                                <div className={`mt-3 p-3 rounded-lg text-sm flex items-center gap-2 ${
+                                    testEmailResult.success
+                                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
+                                        : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
+                                }`}>
+                                    {testEmailResult.success
+                                        ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                                        : <XCircle className="w-4 h-4 flex-shrink-0" />}
+                                    {testEmailResult.message}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
