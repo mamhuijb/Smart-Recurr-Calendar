@@ -247,6 +247,12 @@ class ApiClient {
   createOffice365Event(data: { calendarId?: string; subject: string; description: string; startDateTime: string; endDateTime: string; timeZone?: string }) {
     return this.request<{ success: boolean; eventId?: string }>('POST', '/integrations/office365/calendar-event', data);
   }
+
+  // ── Email Logs ──────────────────────────────────────────────
+
+  getEmailLogs() {
+    return this.request<{ logs: Array<{ id: string; recipient: string; subject: string; status: string; method: string; error: string | null; created_at: string }> }>('GET', '/email-logs');
+  }
 }
 
 export const api = new ApiClient();

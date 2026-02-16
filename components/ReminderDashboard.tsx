@@ -10,9 +10,9 @@ interface ReminderDashboardProps {
   services: Service[];
 }
 
-export const ReminderDashboard: React.FC<ReminderDashboardProps> = ({ 
-  events, 
-  currentDate, 
+export const ReminderDashboard: React.FC<ReminderDashboardProps> = ({
+  events,
+  currentDate,
   settings,
   customers,
   services
@@ -26,21 +26,26 @@ export const ReminderDashboard: React.FC<ReminderDashboardProps> = ({
       // Find linked data
       const customer = customers.find(c => c.id === event.customerId);
       const service = services.find(s => s.id === event.serviceId);
-      
+
       if (!customer || !service) return; // Skip broken links
+
+      // Use per-service reminder days if set, otherwise fall back to global
+      const reminderDays = (service.reminderDays && service.reminderDays.length > 0)
+          ? service.reminderDays
+          : settings.reminders.days;
 
       event.generatedDates.forEach(dateStr => {
         const eventTime = new Date(dateStr).getTime();
         const diffTime = eventTime - todayTime;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        // Check against dynamic rules from settings
-        if (settings.reminders.days.includes(diffDays) || diffDays === 0) {
-            
+        // Check against dynamic rules (per-service or global)
+        if (reminderDays.includes(diffDays) || diffDays === 0) {
+
             // Compile Email Preview
             // Check for service-specific template, fallback to global
-            const template = (service.emailTemplate && service.emailTemplate.body) 
-                ? service.emailTemplate 
+            const template = (service.emailTemplate && service.emailTemplate.body)
+                ? service.emailTemplate
                 : settings.templates.reminder;
 
             let body = template.body;
@@ -64,6 +69,21 @@ export const ReminderDashboard: React.FC<ReminderDashboardProps> = ({
     return reminders.sort((a, b) => a.daysUntil - b.daysUntil);
   }, [events, currentDate, settings, customers, services]);
 
+  // Determine which mail method is configured/preferred
+  const mailMethodLabel = useMemo(() => {
+    const pref = settings.preferredMailMethod || 'auto';
+    const smtpReady = !!settings.smtp?.host;
+    const o365Ready = !!settings.office365?.auth?.isConnected;
+
+    if (pref === 'smtp' && smtpReady) return 'SMTP';
+    if (pref === 'office365' && o365Ready) return 'Office 365';
+    if (pref === 'auto') {
+      if (smtpReady) return 'SMTP';
+      if (o365Ready) return 'Office 365';
+    }
+    return 'Not configured';
+  }, [settings]);
+
   const getReminderColor = (days: number) => {
       if (days === 0) return 'bg-red-900/20 border-red-500';
       if (days === 1) return 'bg-orange-900/20 border-orange-500';
@@ -82,7 +102,7 @@ export const ReminderDashboard: React.FC<ReminderDashboardProps> = ({
           {currentDate.toLocaleDateString()}
         </span>
       </div>
-      
+
       <div className="p-4 space-y-3 h-[400px] overflow-y-auto custom-scrollbar">
         {activeReminders.length === 0 ? (
           <div className="text-center py-12 text-slate-600">
@@ -91,7 +111,7 @@ export const ReminderDashboard: React.FC<ReminderDashboardProps> = ({
           </div>
         ) : (
           activeReminders.map((reminder, idx) => (
-            <div 
+            <div
               key={`${reminder.eventId}-${idx}`}
               className={`p-4 rounded-lg border-l-4 shadow-sm ${getReminderColor(reminder.daysUntil)}`}
             >
@@ -104,14 +124,14 @@ export const ReminderDashboard: React.FC<ReminderDashboardProps> = ({
                 </span>
               </div>
               <h4 className="font-bold text-slate-200">{reminder.eventTitle}</h4>
-              
+
               <div className="mt-3 bg-slate-950 p-2 rounded border border-slate-800 text-xs text-slate-400 font-mono whitespace-pre-wrap">
                 {reminder.emailBody}
               </div>
 
               <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-wider">
                   <Mail className="w-3 h-3" />
-                  Via {settings.smtp?.host ? 'SMTP' : settings.office365.auth.isConnected ? 'Office 365' : 'Not configured'}
+                  Via {mailMethodLabel}
               </div>
             </div>
           ))

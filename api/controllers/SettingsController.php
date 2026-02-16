@@ -5,6 +5,7 @@ class SettingsController {
     private static array $validKeys = [
         'branding', 'security', 'reminders', 'holidays',
         'manualClosures', 'businessHours', 'templates',
+        'preferredMailMethod',
     ];
 
     public static function index(): void {

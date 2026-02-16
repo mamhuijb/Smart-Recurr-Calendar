@@ -212,6 +212,7 @@ class IntegrationController {
 
     /**
      * POST /integrations/email/send — send an email via configured method (SMTP or Office 365).
+     * Respects preferredMailMethod setting: 'auto' (SMTP > O365), 'smtp', or 'office365'.
      */
     public static function sendEmail(array $body): void {
         AuthMiddleware::verify();
@@ -224,46 +225,111 @@ class IntegrationController {
             Response::error('to, subject, and body are required', 400);
         }
 
-        // Validate email format
         if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
             Response::error('Invalid email address', 400);
         }
 
         $db = Database::getInstance();
 
-        // Check which email method is configured
-        // Priority: SMTP > Office 365 > fail
+        // Get preferred mail method from settings
+        $prefStmt = $db->prepare('SELECT setting_value FROM settings WHERE setting_key = ?');
+        $prefStmt->execute(['preferredMailMethod']);
+        $prefRow = $prefStmt->fetch();
+        $preferred = $prefRow ? json_decode($prefRow['setting_value'], true) : 'auto';
+        if (!in_array($preferred, ['auto', 'smtp', 'office365'])) $preferred = 'auto';
+
+        // Load configs
         $smtpStmt = $db->prepare('SELECT config FROM integration_configs WHERE id = ?');
         $smtpStmt->execute(['smtp']);
-        $smtpRow = $smtpStmt->fetch();
-        $smtpConfig = $smtpRow ? json_decode($smtpRow['config'], true) : [];
+        $smtpConfig = ($smtpStmt->fetch() ?: []);
+        $smtpConfig = !empty($smtpConfig['config']) ? json_decode($smtpConfig['config'], true) : [];
+        $smtpReady = !empty($smtpConfig['host']) && !empty($smtpConfig['username']);
 
-        if (!empty($smtpConfig['host']) && !empty($smtpConfig['username'])) {
-            // Use SMTP
-            $result = SmtpMailer::send($smtpConfig, $to, $subject, $emailBody);
-            if ($result['success']) {
-                Response::json(['success' => true, 'method' => 'smtp']);
-            } else {
-                Response::error('SMTP: ' . $result['error'], 500);
-            }
-        }
-
-        // Try Office 365
         $o365Stmt = $db->prepare('SELECT config FROM integration_configs WHERE id = ?');
         $o365Stmt->execute(['office365']);
-        $o365Row = $o365Stmt->fetch();
-        $o365Config = $o365Row ? json_decode($o365Row['config'], true) : [];
+        $o365Config = ($o365Stmt->fetch() ?: []);
+        $o365Config = !empty($o365Config['config']) ? json_decode($o365Config['config'], true) : [];
+        $o365Ready = !empty($o365Config['accessToken']);
 
-        if (!empty($o365Config['accessToken'])) {
-            $result = Office365Integration::sendMail($o365Config, $to, $subject, $emailBody);
-            if ($result['success']) {
-                Response::json(['success' => true, 'method' => 'office365']);
-            } else {
-                Response::error('Office 365: ' . ($result['error'] ?? 'Send failed'), 500);
+        // Determine send order based on preference
+        $tryOrder = [];
+        if ($preferred === 'smtp')        $tryOrder = ['smtp'];
+        elseif ($preferred === 'office365') $tryOrder = ['office365'];
+        else                               $tryOrder = ['smtp', 'office365']; // auto
+
+        $method = '';
+        $success = false;
+        $error = '';
+
+        foreach ($tryOrder as $try) {
+            if ($try === 'smtp' && $smtpReady) {
+                $result = SmtpMailer::send($smtpConfig, $to, $subject, $emailBody);
+                $method = 'smtp';
+                $success = $result['success'];
+                $error = $result['error'] ?? '';
+                break;
+            } elseif ($try === 'office365' && $o365Ready) {
+                $result = Office365Integration::sendMail($o365Config, $to, $subject, $emailBody);
+                $method = 'office365';
+                $success = $result['success'];
+                $error = $result['error'] ?? '';
+                break;
             }
         }
 
-        Response::error('No email method configured. Set up SMTP or connect Office 365.', 400);
+        // Log the email attempt
+        if ($method) {
+            self::logEmail($db, $to, $subject, $success ? 'sent' : 'failed', $method, $error);
+        }
+
+        if (!$method) {
+            Response::error('No email method configured. Set up SMTP or connect Office 365.', 400);
+        } elseif ($success) {
+            Response::json(['success' => true, 'method' => $method]);
+        } else {
+            Response::error(ucfirst($method) . ': ' . $error, 500);
+        }
+    }
+
+    /**
+     * GET /email-logs — list recent email logs.
+     */
+    public static function emailLogs(): void {
+        AuthMiddleware::verify();
+        $db = Database::getInstance();
+
+        // Ensure table exists (auto-migrate for existing installs)
+        $db->exec('CREATE TABLE IF NOT EXISTS email_logs (
+            id VARCHAR(36) PRIMARY KEY,
+            recipient VARCHAR(255) NOT NULL,
+            subject VARCHAR(500) NOT NULL,
+            status ENUM(\'sent\', \'failed\') NOT NULL DEFAULT \'sent\',
+            method VARCHAR(20) NOT NULL DEFAULT \'smtp\',
+            error TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_status (status),
+            INDEX idx_created (created_at)
+        ) ENGINE=InnoDB');
+
+        $rows = $db->query('SELECT * FROM email_logs ORDER BY created_at DESC LIMIT 100')->fetchAll();
+        Response::json(['logs' => $rows]);
+    }
+
+    private static function logEmail(\PDO $db, string $to, string $subject, string $status, string $method, string $error = ''): void {
+        // Ensure table exists
+        $db->exec('CREATE TABLE IF NOT EXISTS email_logs (
+            id VARCHAR(36) PRIMARY KEY,
+            recipient VARCHAR(255) NOT NULL,
+            subject VARCHAR(500) NOT NULL,
+            status ENUM(\'sent\', \'failed\') NOT NULL DEFAULT \'sent\',
+            method VARCHAR(20) NOT NULL DEFAULT \'smtp\',
+            error TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB');
+
+        $id = UUID::generate();
+        $stmt = $db->prepare('INSERT INTO email_logs (id, recipient, subject, status, method, error) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt->execute([$id, $to, $subject, $status, $method, $error ?: null]);
     }
 
     public static function syncroCreateTicket(array $body): void {

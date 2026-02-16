@@ -126,6 +126,7 @@ route('POST', '/integrations/syncro/tickets',      fn($b, $p) => IntegrationCont
 route('POST', '/integrations/email/send',          fn($b, $p) => IntegrationController::sendEmail($b));
 route('GET',  '/integrations/office365/calendars',  fn($b, $p) => IntegrationController::office365Calendars());
 route('POST', '/integrations/office365/calendar-event', fn($b, $p) => IntegrationController::office365CreateEvent($b));
+route('GET',  '/email-logs',                            fn($b, $p) => IntegrationController::emailLogs());
 
 // ── 404 ─────────────────────────────────────────────────────
 if (!$matched) {

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppSettings, Customer, Service, Technician, RecurrenceEvent } from '../types';
-import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone, Loader2, Mail, Send } from 'lucide-react';
+import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone, Loader2, Mail, Send, FileText, Plus } from 'lucide-react';
 import { api } from '../services/api';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateSecret, generateTotpUri } from '../utils/authSecurity';
@@ -25,7 +25,7 @@ interface AdminPanelProps {
     onClose: () => void;
 }
 
-type Tab = 'REPORTS' | 'BRANDING' | 'OAUTH' | 'SMTP' | 'INTEGRATIONS' | 'INVOICENINJA' | 'ZOHO' | 'SERVICES' | 'TECHS' | 'CUSTOMERS' | 'BUSINESS' | 'NOTIFICATIONS' | 'BACKUP' | 'SECURITY';
+type Tab = 'REPORTS' | 'BRANDING' | 'OAUTH' | 'SMTP' | 'INTEGRATIONS' | 'INVOICENINJA' | 'ZOHO' | 'SERVICES' | 'TECHS' | 'CUSTOMERS' | 'BUSINESS' | 'NOTIFICATIONS' | 'EMAIL_LOGS' | 'BACKUP' | 'SECURITY';
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
     settings,
@@ -57,6 +57,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     // State for Service Template Editing
     const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
     const [editingTemplate, setEditingTemplate] = useState<{ subject: string, body: string }>({ subject: '', body: '' });
+    const [editingReminderDays, setEditingReminderDays] = useState<number[]>([]);
+
+    // Email logs
+    const [emailLogs, setEmailLogs] = useState<Array<{ id: string; recipient: string; subject: string; status: string; method: string; error: string | null; created_at: string }>>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
 
     // --- REPORTING LOGIC ---
     const reportData = useMemo(() => {
@@ -310,6 +315,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 manualClosures: localSettings.manualClosures,
                 businessHours: localSettings.businessHours,
                 templates: localSettings.templates,
+                preferredMailMethod: localSettings.preferredMailMethod,
             });
 
             // Save integration configs to database
@@ -422,7 +428,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                     <div className="px-2 pb-1 pt-4 text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-wider">System</div>
                     <button onClick={() => setActiveTab('NOTIFICATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'NOTIFICATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Bell className="w-4 h-4" /> Global Templates
+                        <Bell className="w-4 h-4" /> Email & Reminders
+                    </button>
+                    <button onClick={() => { setActiveTab('EMAIL_LOGS'); if (emailLogs.length === 0) { setLoadingLogs(true); api.getEmailLogs().then(r => setEmailLogs(r.logs || [])).catch(() => {}).finally(() => setLoadingLogs(false)); } }} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'EMAIL_LOGS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
+                        <FileText className="w-4 h-4" /> Email Logs
                     </button>
                     <button onClick={() => setActiveTab('BACKUP')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'BACKUP' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <Database className="w-4 h-4" /> Backup & Restore
@@ -1035,21 +1044,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                             <button
                                                 onClick={async () => {
                                                     if (editingServiceId === s.id) {
-                                                        // Save Template to DB and state
-                                                        const updatedService = { ...s, emailTemplate: editingTemplate };
+                                                        // Save Template + reminderDays to DB and state
+                                                        const updatedService = {
+                                                            ...s,
+                                                            emailTemplate: editingTemplate,
+                                                            reminderDays: editingReminderDays.length > 0 ? editingReminderDays : undefined,
+                                                        };
                                                         try { await api.updateService(s.id, updatedService); } catch {}
                                                         const updated = services.map(svc => svc.id === s.id ? updatedService : svc);
                                                         onUpdateServices(updated);
                                                         setEditingServiceId(null);
                                                     } else {
-                                                        // Edit Template
+                                                        // Open editor
                                                         setEditingServiceId(s.id);
                                                         setEditingTemplate(s.emailTemplate || { subject: '', body: '' });
+                                                        setEditingReminderDays(s.reminderDays || []);
                                                     }
                                                 }}
                                                 className={`text-sm px-3 py-1 rounded border ${editingServiceId === s.id ? 'bg-green-600 border-green-500 text-white' : 'border-gray-300 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
                                             >
-                                                {editingServiceId === s.id ? 'Save Template' : 'Edit Email Template'}
+                                                {editingServiceId === s.id ? 'Save Changes' : 'Edit Settings'}
                                             </button>
                                             <button onClick={async () => {
                                                 try { await api.deleteService(s.id); } catch {}
@@ -1060,24 +1074,81 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* Inline Template Editor */}
+                                    {/* Inline Service Settings Editor */}
                                     {editingServiceId === s.id && (
-                                        <div className="mt-4 p-4 bg-white dark:bg-slate-900 rounded border border-gray-200 dark:border-slate-700 animate-in fade-in slide-in-from-top-2">
-                                            <h5 className="text-xs font-bold text-primary-500 uppercase mb-2">Custom Email Template for {s.name}</h5>
-                                            <div className="space-y-2">
-                                                <input
-                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded text-sm text-gray-900 dark:text-white"
-                                                    placeholder="Subject (Leave empty to use global default)"
-                                                    value={editingTemplate.subject}
-                                                    onChange={e => setEditingTemplate({ ...editingTemplate, subject: e.target.value })}
-                                                />
-                                                <textarea
-                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded text-sm text-gray-900 dark:text-white h-24 font-mono"
-                                                    placeholder="Body content..."
-                                                    value={editingTemplate.body}
-                                                    onChange={e => setEditingTemplate({ ...editingTemplate, body: e.target.value })}
-                                                />
-                                                <p className="text-xs text-gray-500 dark:text-slate-500">Overrides global template if set.</p>
+                                        <div className="mt-4 p-4 bg-white dark:bg-slate-900 rounded border border-gray-200 dark:border-slate-700 animate-in fade-in slide-in-from-top-2 space-y-4">
+                                            {/* Per-service Reminder Schedule */}
+                                            <div>
+                                                <h5 className="text-xs font-bold text-orange-500 uppercase mb-2 flex items-center gap-1">
+                                                    <Bell className="w-3 h-3" /> Reminder Schedule for {s.name}
+                                                </h5>
+                                                <p className="text-xs text-gray-500 dark:text-slate-500 mb-2">
+                                                    Set custom reminder days for this service. Leave empty to use the global schedule ({localSettings.reminders.days.sort((a,b) => b-a).join(', ')} days).
+                                                </p>
+                                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                                    {editingReminderDays.sort((a, b) => b - a).map(day => (
+                                                        <span key={day} className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium border border-orange-200 dark:border-orange-800">
+                                                            {day}d
+                                                            <button onClick={() => setEditingReminderDays(editingReminderDays.filter(d => d !== day))} className="text-orange-500 hover:text-red-500">
+                                                                <XCircle className="w-3 h-3" />
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                    {editingReminderDays.length === 0 && (
+                                                        <span className="text-xs text-gray-400 dark:text-slate-500 italic">Using global schedule</span>
+                                                    )}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="90"
+                                                        id={`svcReminder-${s.id}`}
+                                                        className="w-20 px-2 py-1 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded text-sm text-gray-900 dark:text-white"
+                                                        placeholder="Days"
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            const input = document.getElementById(`svcReminder-${s.id}`) as HTMLInputElement;
+                                                            const val = parseInt(input.value);
+                                                            if (!isNaN(val) && val >= 0 && val <= 90 && !editingReminderDays.includes(val)) {
+                                                                setEditingReminderDays([...editingReminderDays, val]);
+                                                                input.value = '';
+                                                            }
+                                                        }}
+                                                        className="bg-orange-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-orange-700 flex items-center gap-1"
+                                                    >
+                                                        <Plus className="w-3 h-3" /> Add
+                                                    </button>
+                                                    {editingReminderDays.length > 0 && (
+                                                        <button
+                                                            onClick={() => setEditingReminderDays([])}
+                                                            className="text-xs text-gray-500 dark:text-slate-400 hover:text-red-500 px-2"
+                                                        >
+                                                            Clear (use global)
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Email Template */}
+                                            <div>
+                                                <h5 className="text-xs font-bold text-primary-500 uppercase mb-2">Custom Email Template for {s.name}</h5>
+                                                <div className="space-y-2">
+                                                    <input
+                                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded text-sm text-gray-900 dark:text-white"
+                                                        placeholder="Subject (Leave empty to use global default)"
+                                                        value={editingTemplate.subject}
+                                                        onChange={e => setEditingTemplate({ ...editingTemplate, subject: e.target.value })}
+                                                    />
+                                                    <textarea
+                                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded text-sm text-gray-900 dark:text-white h-24 font-mono"
+                                                        placeholder="Body content..."
+                                                        value={editingTemplate.body}
+                                                        onChange={e => setEditingTemplate({ ...editingTemplate, body: e.target.value })}
+                                                    />
+                                                    <p className="text-xs text-gray-500 dark:text-slate-500">Overrides global template if set. Variables: {'{customer_name}, {service_name}, {date}, {tech_name}'}</p>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -1091,6 +1162,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {activeTab === 'NOTIFICATIONS' && (
                     <div className="space-y-6 max-w-3xl">
                         <h3 className="text-2xl font-bold text-gray-800 dark:text-white border-b border-gray-200 dark:border-slate-700 pb-4">Email & Reminders</h3>
+
+                        {/* Outgoing Mail Method */}
+                        <div className="bg-gray-50 dark:bg-slate-800 p-5 rounded-xl border border-gray-200 dark:border-slate-700">
+                            <h4 className="font-bold text-gray-800 dark:text-white mb-1 flex items-center gap-2">
+                                <Mail className="w-4 h-4 text-blue-500" />
+                                Outgoing Mail Method
+                            </h4>
+                            <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Choose which service to use for sending reminder emails.</p>
+                            <div className="grid grid-cols-3 gap-3">
+                                {(['auto', 'smtp', 'office365'] as const).map(method => (
+                                    <button
+                                        key={method}
+                                        onClick={() => setLocalSettings(prev => ({ ...prev, preferredMailMethod: method }))}
+                                        className={`p-3 rounded-lg border-2 text-center transition-all ${
+                                            localSettings.preferredMailMethod === method
+                                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                                                : 'border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:border-gray-300 dark:hover:border-slate-600'
+                                        }`}
+                                    >
+                                        <div className="font-bold text-sm">{method === 'auto' ? 'Auto' : method === 'smtp' ? 'SMTP' : 'Office 365'}</div>
+                                        <div className="text-xs mt-1 opacity-75">
+                                            {method === 'auto' ? 'SMTP first, then O365' : method === 'smtp' ? 'SMTP server only' : 'Microsoft Graph API'}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-slate-500 mt-2">
+                                Current: <span className="font-medium">
+                                    {localSettings.preferredMailMethod === 'auto' ? 'Auto (tries SMTP first, falls back to Office 365)'
+                                        : localSettings.preferredMailMethod === 'smtp' ? 'SMTP only'
+                                        : 'Office 365 only'}
+                                </span>
+                            </p>
+                        </div>
 
                         {/* Reminder Frequency */}
                         <div className="bg-gray-50 dark:bg-slate-800 p-5 rounded-xl border border-gray-200 dark:border-slate-700">
@@ -1192,6 +1297,79 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {/* EMAIL LOGS Tab */}
+                {activeTab === 'EMAIL_LOGS' && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center border-b border-gray-200 dark:border-slate-700 pb-4">
+                            <h3 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <FileText className="w-6 h-6 text-blue-500" />
+                                Email Logs
+                            </h3>
+                            <button
+                                onClick={() => { setLoadingLogs(true); api.getEmailLogs().then(r => setEmailLogs(r.logs || [])).catch(() => {}).finally(() => setLoadingLogs(false)); }}
+                                className="text-sm bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-gray-200 dark:border-slate-700"
+                            >
+                                <RefreshCw className={`w-3.5 h-3.5 ${loadingLogs ? 'animate-spin' : ''}`} /> Refresh
+                            </button>
+                        </div>
+
+                        {loadingLogs ? (
+                            <div className="text-center py-12 text-gray-400 dark:text-slate-500 flex flex-col items-center gap-2">
+                                <Loader2 className="w-8 h-8 animate-spin" />
+                                Loading logs...
+                            </div>
+                        ) : emailLogs.length === 0 ? (
+                            <div className="text-center py-12 text-gray-400 dark:text-slate-500">
+                                <Mail className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                                <p>No emails sent yet. Send a test email or reminder to see logs here.</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto border border-gray-200 dark:border-slate-700 rounded-lg">
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                                    <thead className="bg-gray-50 dark:bg-slate-800">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Time</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Recipient</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Subject</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Method</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-slate-700">
+                                        {emailLogs.map(log => (
+                                            <tr key={log.id} className={log.status === 'failed' ? 'bg-red-50 dark:bg-red-900/10' : ''}>
+                                                <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-slate-400 font-mono">
+                                                    {new Date(log.created_at).toLocaleString()}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-slate-300">{log.recipient}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300 max-w-[250px] truncate">{log.subject}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${log.method === 'smtp' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'}`}>
+                                                        {log.method === 'smtp' ? 'SMTP' : 'Office 365'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    {log.status === 'sent' ? (
+                                                        <span className="text-xs font-medium text-green-600 dark:text-green-400 flex items-center gap-1">
+                                                            <CheckCircle2 className="w-3.5 h-3.5" /> Sent
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs font-medium text-red-600 dark:text-red-400 flex items-center gap-1" title={log.error || 'Unknown error'}>
+                                                            <XCircle className="w-3.5 h-3.5" /> Failed
+                                                            {log.error && <span className="text-[10px] text-red-400 dark:text-red-500 ml-1 max-w-[150px] truncate">({log.error})</span>}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                        <p className="text-xs text-gray-400 dark:text-slate-600">Showing last 100 emails. Logs are stored in the database.</p>
                     </div>
                 )}
 

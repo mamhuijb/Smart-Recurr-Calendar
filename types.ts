@@ -51,7 +51,18 @@ export interface Service {
   defaultLocation: LocationType;
   color: string;
   createTicket: boolean;
-  emailTemplate?: EmailTemplate; // New: Service specific template
+  emailTemplate?: EmailTemplate;
+  reminderDays?: number[]; // Per-service override; falls back to global if empty/undefined
+}
+
+export interface EmailLogEntry {
+  id: string;
+  recipient: string;
+  subject: string;
+  status: 'sent' | 'failed';
+  method: 'smtp' | 'office365';
+  error?: string;
+  createdAt: string;
 }
 
 export interface EmailTemplate {
@@ -113,6 +124,7 @@ export interface AppSettings {
     calendarSyncEnabled?: boolean;
   };
   smtp: SmtpConfig;
+  preferredMailMethod: 'auto' | 'smtp' | 'office365';
   integrations: {
     syncroApiKey: string;
     syncroSubdomain: string;
@@ -170,6 +182,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     fromName: 'SmartRecur',
     encryption: 'tls',
   },
+  preferredMailMethod: 'auto',
   integrations: { 
       syncroApiKey: '', 
       syncroSubdomain: '',

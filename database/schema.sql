@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS services (
     create_ticket TINYINT(1) NOT NULL DEFAULT 0,
     email_template_subject VARCHAR(500) DEFAULT NULL,
     email_template_body TEXT DEFAULT NULL,
+    reminder_days JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -121,11 +122,27 @@ INSERT INTO settings (setting_key, setting_value) VALUES
     ('holidays', JSON_ARRAY('2025-01-01', '2025-04-27', '2025-12-25', '2025-12-26')),
     ('manualClosures', JSON_ARRAY()),
     ('businessHours', JSON_OBJECT('start', '09:00', 'end', '17:00', 'closedDays', JSON_ARRAY(0))),
+    ('preferredMailMethod', '"auto"'),
     ('templates', JSON_OBJECT('reminder', JSON_OBJECT(
         'subject', 'Appointment: {service_name} - {date}',
         'body', 'Hi {customer_name},\n\nWe have scheduled a technician ({tech_name}) for {service_name} on {date}.\nLocation: {location_type}\n\nPlease click here to confirm or reschedule: {link}\n\nMet vriendelijke groet,\n{company_name}'
     )))
 ON DUPLICATE KEY UPDATE setting_key = setting_key;
+
+-- ============================================================
+-- EMAIL LOGS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS email_logs (
+    id VARCHAR(36) PRIMARY KEY,
+    recipient VARCHAR(255) NOT NULL,
+    subject VARCHAR(500) NOT NULL,
+    status ENUM('sent', 'failed') NOT NULL DEFAULT 'sent',
+    method VARCHAR(20) NOT NULL DEFAULT 'smtp',
+    error TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_status (status),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB;
 
 -- ============================================================
 -- INTEGRATION CONFIGS
