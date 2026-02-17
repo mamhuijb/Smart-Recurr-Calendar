@@ -142,6 +142,70 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return { total, quarters, monthly, remoteCount, onsiteCount, currentYear };
     }, [events]);
 
+    // --- PENDING REMINDERS (Email Queue Preview) ---
+    const pendingReminders = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayTime = today.getTime();
+        const reminders: Array<{
+            eventId: string;
+            eventTitle: string;
+            customerName: string;
+            customerEmail: string;
+            targetDate: string;
+            daysUntil: number;
+            emailSubject: string;
+            emailBody: string;
+        }> = [];
+
+        events.forEach(event => {
+            const customer = customers.find(c => c.id === event.customerId);
+            const service = services.find(s => s.id === event.serviceId);
+            if (!customer || !service) return;
+
+            const reminderDays = (service.reminderDays && service.reminderDays.length > 0)
+                ? service.reminderDays
+                : settings.reminders.days;
+
+            const template = (service.emailTemplate && service.emailTemplate.body)
+                ? service.emailTemplate
+                : settings.templates.reminder;
+
+            event.generatedDates.forEach(dateStr => {
+                const eventTime = new Date(dateStr).getTime();
+                const diffDays = Math.ceil((eventTime - todayTime) / (1000 * 60 * 60 * 24));
+
+                if (reminderDays.includes(diffDays) || diffDays === 0) {
+                    let subject = template.subject;
+                    let body = template.body;
+                    const replacements: Record<string, string> = {
+                        '{customer_name}': customer.name,
+                        '{service_name}': service.name,
+                        '{date}': dateStr,
+                        '{company_name}': customer.company || '',
+                    };
+                    for (const [key, val] of Object.entries(replacements)) {
+                        subject = subject.split(key).join(val);
+                        body = body.split(key).join(val);
+                    }
+
+                    reminders.push({
+                        eventId: event.id,
+                        eventTitle: event.title,
+                        customerName: customer.name,
+                        customerEmail: customer.email,
+                        targetDate: dateStr,
+                        daysUntil: diffDays,
+                        emailSubject: subject,
+                        emailBody: body,
+                    });
+                }
+            });
+        });
+
+        return reminders.sort((a, b) => a.daysUntil - b.daysUntil);
+    }, [events, customers, services, settings]);
+
     // Syncro MSP Import via PHP backend proxy
     const handleSyncroImport = async () => {
         try {
@@ -1446,6 +1510,47 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <RefreshCw className={`w-3.5 h-3.5 ${loadingLogs ? 'animate-spin' : ''}`} /> Refresh
                             </button>
                         </div>
+
+                        {/* Pending Reminder Queue */}
+                        {pendingReminders.length > 0 && (
+                            <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                                <h4 className="font-bold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
+                                    <Bell className="w-4 h-4 text-amber-500" />
+                                    Pending Reminders ({pendingReminders.length})
+                                </h4>
+                                <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                    {pendingReminders.map((r, idx) => (
+                                        <div key={`${r.eventId}-${r.targetDate}-${idx}`} className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                                    r.daysUntil === 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
+                                                    : r.daysUntil <= 1 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800'
+                                                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                                                }`}>
+                                                    {r.daysUntil === 0 ? 'TODAY' : `${r.daysUntil} day${r.daysUntil > 1 ? 's' : ''} out`}
+                                                </span>
+                                                <span className="text-xs text-gray-500 dark:text-slate-400 font-mono">{r.targetDate}</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-800 dark:text-slate-200">{r.eventTitle}</p>
+                                            <p className="text-xs text-gray-500 dark:text-slate-400">To: {r.customerEmail || r.customerName}</p>
+                                            <details className="mt-2">
+                                                <summary className="text-xs text-indigo-600 dark:text-indigo-400 cursor-pointer hover:underline">Preview email</summary>
+                                                <div className="mt-2 bg-gray-50 dark:bg-slate-900 p-2 rounded border border-gray-200 dark:border-slate-700 text-xs">
+                                                    <p className="font-bold text-gray-700 dark:text-slate-300 mb-1">Subject: {r.emailSubject}</p>
+                                                    <pre className="text-gray-600 dark:text-slate-400 whitespace-pre-wrap font-mono text-[11px]">{r.emailBody}</pre>
+                                                </div>
+                                            </details>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Sent Email Logs */}
+                        <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-blue-500" />
+                            Sent Emails
+                        </h4>
 
                         {loadingLogs ? (
                             <div className="text-center py-12 text-gray-400 dark:text-slate-500 flex flex-col items-center gap-2">

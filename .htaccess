@@ -3,15 +3,18 @@
 
 RewriteEngine On
 
-# ─── Disable ModSecurity for API (Plesk/CloudLinux) ──────────
-# ModSecurity often blocks PUT/DELETE/PATCH methods with 403.
-<IfModule mod_security2.c>
-    SecRuleEngine Off
-</IfModule>
-<IfModule mod_security.c>
-    SecFilterEngine Off
-    SecFilterScanPOST Off
-</IfModule>
+# ─── Imunify360 / ModSecurity Compatibility ──────────────────
+# We no longer disable ModSecurity entirely — Imunify360 stays active
+# to protect against XSS, SQLi, and other attacks.
+#
+# PUT/DELETE methods are sent as POST with X-HTTP-Method-Override header
+# (handled by api/index.php), so WAF rules that block non-standard
+# HTTP methods no longer trigger.
+#
+# If Imunify360 blocks a legitimate API request:
+# 1. Check Imunify360 → Incidents for the rule ID
+# 2. Add a targeted exclusion below: SecRuleRemoveById <rule-id>
+# 3. Or whitelist the path in Imunify360's dashboard
 
 # ─── Default document ──────────────────────────────────────────
 # Serve app.html (production build) instead of index.html (dev template)

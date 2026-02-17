@@ -3,11 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { RecurrenceEvent, ViewMode, AppSettings, Customer, Service, Technician, DEFAULT_SETTINGS } from './types';
 import { EventCreator } from './components/EventCreator';
 import { CalendarGrid } from './components/CalendarGrid';
-import { ReminderDashboard } from './components/ReminderDashboard';
+import { ScheduledJobs } from './components/ScheduledJobs';
+import { EditEventModal } from './components/EditEventModal';
 import { LoginScreen } from './components/LoginScreen';
 import { AdminPanel } from './components/AdminPanel';
 import { api } from './services/api';
-import { Plus, Calendar as CalendarIcon, Clock, Trash2, LogOut, Settings, Download, MapPin, Headset, Sun, Moon } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Clock, Trash2, LogOut, Settings, Download, MapPin, Headset, Sun, Moon, Pencil } from 'lucide-react';
 
 const App: React.FC = () => {
   // Auth State
@@ -24,8 +25,13 @@ const App: React.FC = () => {
   // View State
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.CALENDAR);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [simulatedDate, setSimulatedDate] = useState(new Date());
   const [initialRule, setInitialRule] = useState<string>('');
+
+  // Calendar view state
+  const [calendarView, setCalendarView] = useState<'month' | 'week'>('month');
+
+  // Edit modal state
+  const [editingEvent, setEditingEvent] = useState<RecurrenceEvent | null>(null);
 
   // --- Session timeout check (1 day) ---
   useEffect(() => {
@@ -156,12 +162,23 @@ const App: React.FC = () => {
     setInitialRule('');
   };
 
+  const handleUpdateEvent = async (event: RecurrenceEvent) => {
+    try {
+      await api.updateEvent(event.id, event);
+    } catch {
+      // Continue with local update even if API fails
+    }
+    setEvents(events.map(e => e.id === event.id ? event : e));
+    setEditingEvent(null);
+  };
+
   const handleDeleteEvent = async (id: string) => {
     if(window.confirm('Are you sure you want to delete this appointment?')) {
         try {
           await api.deleteEvent(id);
         } catch { /* continue anyway */ }
         setEvents(events.filter(e => e.id !== id));
+        setEditingEvent(null);
     }
   };
 
@@ -170,6 +187,31 @@ const App: React.FC = () => {
       const rule = date.toLocaleDateString('en-US', options);
       setInitialRule(rule);
       setViewMode(ViewMode.CREATE);
+  };
+
+  const handleEventClick = (event: RecurrenceEvent) => {
+    setEditingEvent(event);
+  };
+
+  // Calendar navigation: month or week depending on view
+  const handlePrev = () => {
+    if (calendarView === 'month') {
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    } else {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - 7);
+      setCurrentDate(d);
+    }
+  };
+
+  const handleNext = () => {
+    if (calendarView === 'month') {
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    } else {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() + 7);
+      setCurrentDate(d);
+    }
   };
 
   const toggleTheme = () => {
@@ -343,15 +385,18 @@ const App: React.FC = () => {
                         manualClosures={settings.manualClosures}
                         businessHours={settings.businessHours}
                         displayDate={currentDate}
-                        onPrevMonth={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}
-                        onNextMonth={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}
+                        calendarView={calendarView}
+                        onCalendarViewChange={setCalendarView}
+                        onPrev={handlePrev}
+                        onNext={handleNext}
                         onDayClick={handleDayClick}
+                        onEventClick={handleEventClick}
                    />
                </div>
 
                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-gray-200 dark:border-slate-800 p-3 sm:p-5 max-h-[200px] overflow-y-auto custom-scrollbar">
                  <h3 className="text-xs sm:text-sm font-bold text-gray-800 dark:text-slate-100 mb-2 sm:mb-3 sticky top-0 bg-white dark:bg-slate-900 pb-2 border-b border-gray-200 dark:border-slate-800 flex items-center gap-2">
-                    <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary-600 dark:text-primary-500"/> Scheduled Jobs
+                    <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary-600 dark:text-primary-500"/> All Appointments ({events.length})
                  </h3>
                  {events.length === 0 ? (
                    <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-500 italic">Click a date on the calendar to schedule an appointment.</p>
@@ -359,7 +404,7 @@ const App: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                         {events.map(event => (
                             <div key={event.id} className="flex justify-between items-start p-2 sm:p-3 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-750 hover:border-gray-300 dark:hover:border-slate-600 rounded-lg border border-gray-200 dark:border-slate-700 transition-all group">
-                                <div className="min-w-0 flex-1">
+                                <div className="min-w-0 flex-1 cursor-pointer" onClick={() => handleEventClick(event)}>
                                     <h4 className="font-semibold text-gray-800 dark:text-slate-200 text-xs sm:text-sm truncate">{event.title}</h4>
                                     <p className="text-[10px] sm:text-xs text-primary-600 dark:text-primary-400 font-medium truncate">{event.recurrenceRule}</p>
                                     <div className="flex gap-1 sm:gap-2 mt-1 flex-wrap">
@@ -374,12 +419,22 @@ const App: React.FC = () => {
                                         </span>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => handleDeleteEvent(event.id)}
-                                    className="text-gray-400 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all ml-1 flex-shrink-0"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                </button>
+                                <div className="flex items-center gap-1 ml-1 flex-shrink-0">
+                                    <button
+                                        onClick={() => handleEventClick(event)}
+                                        className="text-gray-400 dark:text-slate-600 hover:text-indigo-500 dark:hover:text-indigo-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                                        title="Edit"
+                                    >
+                                        <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteEvent(event.id)}
+                                        className="text-gray-400 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                                        title="Delete"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -387,44 +442,33 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            {/* Right Column: Simulator & Reminders */}
+            {/* Right Column: Scheduled Jobs */}
             <div className="lg:col-span-4 flex flex-col gap-4 sm:gap-6 lg:h-full">
-                <div className="bg-gradient-to-br from-primary-900 to-slate-900 border border-slate-700 text-white rounded-xl shadow-lg p-3 sm:p-5">
-                    <h3 className="text-sm sm:text-base font-bold mb-2 flex items-center gap-2 text-primary-200">
-                        <Clock className="w-4 h-4" />
-                        Date Simulator
-                    </h3>
-                    <div className="flex gap-2 items-center">
-                        <input
-                            type="date"
-                            className="flex-1 px-2 sm:px-3 py-1.5 bg-white/10 border border-white/20 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary-500 color-scheme-dark"
-                            value={simulatedDate.toISOString().split('T')[0]}
-                            onChange={(e) => {
-                                if(e.target.value) setSimulatedDate(new Date(e.target.value));
-                            }}
-                        />
-                         <button
-                            onClick={() => setSimulatedDate(new Date())}
-                            className="px-2 sm:px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 rounded border border-white/20 transition-colors"
-                        >
-                            Reset
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-hidden">
-                    <ReminderDashboard
-                        events={events}
-                        currentDate={simulatedDate}
-                        settings={settings}
-                        customers={customers}
-                        services={services}
-                    />
-                </div>
+                <ScheduledJobs
+                    events={events}
+                    customers={customers}
+                    services={services}
+                    technicians={technicians}
+                    settings={settings}
+                    onEditEvent={handleEventClick}
+                />
             </div>
           </div>
         )}
       </main>
+
+      {/* Edit Event Modal */}
+      {editingEvent && (
+        <EditEventModal
+          event={editingEvent}
+          customers={customers}
+          services={services}
+          technicians={technicians}
+          onSave={handleUpdateEvent}
+          onDelete={handleDeleteEvent}
+          onClose={() => setEditingEvent(null)}
+        />
+      )}
     </div>
   );
 };
