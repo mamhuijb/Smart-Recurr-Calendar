@@ -140,10 +140,10 @@ const App: React.FC = () => {
         const tech = technicians.find(t => t.id === event.technicianId);
 
         for (const dateStr of event.generatedDates) {
-          const startTime = `${dateStr}T${settings.businessHours.start}:00`;
-          const durationHours = (service?.defaultDurationMin || 60) / 60;
-          const endHour = parseInt(settings.businessHours.start.split(':')[0]) + durationHours;
-          const endTime = `${dateStr}T${String(Math.floor(endHour)).padStart(2, '0')}:${String(Math.round((endHour % 1) * 60)).padStart(2, '0')}:00`;
+          const evStart = event.startTime || settings.businessHours.start;
+          const evEnd = event.endTime || settings.businessHours.end;
+          const startTime = `${dateStr}T${evStart}:00`;
+          const endTime = `${dateStr}T${evEnd}:00`;
 
           api.createOffice365Event({
             calendarId: settings.office365.selectedCalendarId || '',
@@ -369,6 +369,7 @@ const App: React.FC = () => {
             customers={customers}
             services={services}
             technicians={technicians}
+            businessHours={settings.businessHours}
             onSave={handleSaveEvent}
             onCancel={() => setViewMode(ViewMode.CALENDAR)}
           />
@@ -464,6 +465,7 @@ const App: React.FC = () => {
           customers={customers}
           services={services}
           technicians={technicians}
+          businessHours={settings.businessHours}
           onSave={handleUpdateEvent}
           onDelete={handleDeleteEvent}
           onClose={() => setEditingEvent(null)}

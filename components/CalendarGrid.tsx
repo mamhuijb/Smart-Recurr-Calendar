@@ -222,13 +222,15 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             >
               <div className="min-w-0 flex-1">
                 <div className="font-semibold truncate text-slate-200">{ev.title}</div>
-                <div className="flex items-center gap-1 mt-0.5 text-slate-400">
-                  {ev.locationType === 'REMOTE' ? (
-                    <Headset className="w-3 h-3 flex-shrink-0" />
-                  ) : (
-                    <MapPin className="w-3 h-3 flex-shrink-0 text-indigo-400" />
+                <div className="flex items-center gap-1.5 mt-0.5 text-slate-400 flex-wrap">
+                  {ev.startTime && (
+                    <span className="text-[10px] font-mono text-indigo-300">{ev.startTime}{ev.endTime ? `–${ev.endTime}` : ''}</span>
                   )}
-                  <span>{ev.locationType === 'ON_SITE' ? 'On Site' : 'Remote'}</span>
+                  {ev.locationType === 'REMOTE' ? (
+                    <span className="flex items-center gap-0.5"><Headset className="w-3 h-3 flex-shrink-0" /> Remote</span>
+                  ) : (
+                    <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3 flex-shrink-0 text-indigo-400" /> Op locatie</span>
+                  )}
                 </div>
               </div>
             </div>

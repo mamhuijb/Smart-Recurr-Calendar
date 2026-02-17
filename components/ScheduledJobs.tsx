@@ -123,7 +123,7 @@ export const ScheduledJobs: React.FC<ScheduledJobsProps> = ({
                   <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                     <span className="text-[10px] text-slate-500 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {settings.businessHours.start} ({job.service?.defaultDurationMin || 60}min)
+                      {job.event.startTime || settings.businessHours.start} – {job.event.endTime || ''} ({job.service?.defaultDurationMin || 60}min)
                     </span>
                     <span className="text-[10px] text-slate-500 flex items-center gap-1">
                       {job.event.locationType === 'ON_SITE' ? (

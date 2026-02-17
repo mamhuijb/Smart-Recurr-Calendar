@@ -2,9 +2,22 @@
 
 class EventController {
 
+    // Auto-migrate: add start_time and end_time columns if missing
+    private static function ensureTimeColumns(\PDO $db): void {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+        try {
+            $db->query('SELECT start_time FROM events LIMIT 1');
+        } catch (\PDOException $e) {
+            $db->exec('ALTER TABLE events ADD COLUMN start_time VARCHAR(5) DEFAULT NULL, ADD COLUMN end_time VARCHAR(5) DEFAULT NULL');
+        }
+    }
+
     public static function index(): void {
         AuthMiddleware::verify();
         $db = Database::getInstance();
+        self::ensureTimeColumns($db);
 
         $rows = $db->query('SELECT * FROM events ORDER BY created_at DESC')->fetchAll();
 
@@ -21,11 +34,13 @@ class EventController {
 
         $id = $body['id'] ?? UUID::v4();
         $db = Database::getInstance();
+        self::ensureTimeColumns($db);
+
         $stmt = $db->prepare('
             INSERT INTO events (id, title, customer_id, service_id, technician_id, asset_id,
                                 syncro_ticket_id, location_type, description, recurrence_rule,
-                                generated_dates, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                generated_dates, start_time, end_time, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $stmt->execute([
             $id,
@@ -39,6 +54,8 @@ class EventController {
             $body['description'] ?? '',
             $body['recurrenceRule'] ?? '',
             json_encode($body['generatedDates'] ?? []),
+            $body['startTime'] ?? null,
+            $body['endTime'] ?? null,
             $body['status'] ?? 'SCHEDULED',
         ]);
 
@@ -53,11 +70,13 @@ class EventController {
     public static function update(string $id, array $body): void {
         AuthMiddleware::verify();
         $db = Database::getInstance();
+        self::ensureTimeColumns($db);
 
         $stmt = $db->prepare('
             UPDATE events SET title = ?, customer_id = ?, service_id = ?, technician_id = ?,
                               asset_id = ?, syncro_ticket_id = ?, location_type = ?,
-                              description = ?, recurrence_rule = ?, generated_dates = ?, status = ?
+                              description = ?, recurrence_rule = ?, generated_dates = ?,
+                              start_time = ?, end_time = ?, status = ?
             WHERE id = ?
         ');
         $stmt->execute([
@@ -71,6 +90,8 @@ class EventController {
             $body['description'] ?? '',
             $body['recurrenceRule'] ?? '',
             json_encode($body['generatedDates'] ?? []),
+            $body['startTime'] ?? null,
+            $body['endTime'] ?? null,
             $body['status'] ?? 'SCHEDULED',
             $id,
         ]);
@@ -100,6 +121,8 @@ class EventController {
             'description'     => $r['description'] ?? '',
             'recurrenceRule'  => $r['recurrence_rule'] ?? '',
             'generatedDates'  => $r['generated_dates'] ?? [],
+            'startTime'       => $r['start_time'] ?? null,
+            'endTime'         => $r['end_time'] ?? null,
             'status'          => $r['status'],
             'createdAt'       => strtotime($r['created_at']) * 1000,
         ];

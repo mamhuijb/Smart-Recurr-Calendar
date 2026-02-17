@@ -3,16 +3,18 @@ export type LocationType = 'REMOTE' | 'ON_SITE';
 
 export interface RecurrenceEvent {
   id: string;
-  title: string; 
-  customerId: string; 
+  title: string;
+  customerId: string;
   serviceId: string;
-  technicianId?: string; 
-  assetId?: string; 
-  syncroTicketId?: string; 
-  locationType: LocationType; 
+  technicianId?: string;
+  assetId?: string;
+  syncroTicketId?: string;
+  locationType: LocationType;
   description: string;
-  recurrenceRule: string; 
-  generatedDates: string[]; 
+  recurrenceRule: string;
+  generatedDates: string[];
+  startTime?: string; // "09:00" — 24h format, defaults to business hours start
+  endTime?: string;   // "10:00" — auto-calculated from startTime + service duration
   status: 'SCHEDULED' | 'COMPLETED' | 'MISSED';
   createdAt: number;
 }

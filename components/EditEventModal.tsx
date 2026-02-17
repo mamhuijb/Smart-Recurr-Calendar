@@ -1,15 +1,37 @@
-import React, { useState } from 'react';
-import { RecurrenceEvent, Customer, Service, Technician, LocationType } from '../types';
-import { X, Save, Trash2, MapPin, Headset, UserCog, Calendar, XCircle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { RecurrenceEvent, Customer, Service, Technician, LocationType, BusinessHours } from '../types';
+import { X, Save, Trash2, MapPin, Headset, UserCog, Calendar, XCircle, Clock } from 'lucide-react';
 
 interface EditEventModalProps {
   event: RecurrenceEvent;
   customers: Customer[];
   services: Service[];
   technicians: Technician[];
+  businessHours: BusinessHours;
   onSave: (event: RecurrenceEvent) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+}
+
+function generateTimeSlots(start: string, end: string): string[] {
+  const slots: string[] = [];
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let h = sh, m = sm;
+  while (h < eh || (h === eh && m <= em)) {
+    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    m += 30;
+    if (m >= 60) { h++; m -= 60; }
+  }
+  return slots;
+}
+
+function calcEndTime(startTime: string, durationMin: number): string {
+  const [h, m] = startTime.split(':').map(Number);
+  const totalMin = h * 60 + m + durationMin;
+  const eh = Math.floor(totalMin / 60);
+  const em = totalMin % 60;
+  return `${String(Math.min(eh, 23)).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
 }
 
 export const EditEventModal: React.FC<EditEventModalProps> = ({
@@ -17,6 +39,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
   customers,
   services,
   technicians,
+  businessHours,
   onSave,
   onDelete,
   onClose,
@@ -29,7 +52,17 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
   const [description, setDescription] = useState(event.description || '');
   const [dates, setDates] = useState<string[]>([...event.generatedDates]);
   const [newDate, setNewDate] = useState('');
+  const [startTime, setStartTime] = useState(event.startTime || businessHours.start);
   const [saving, setSaving] = useState(false);
+
+  const currentService = services.find(s => s.id === serviceId);
+  const durationMin = currentService?.defaultDurationMin || 60;
+  const endTime = calcEndTime(startTime, durationMin);
+
+  const timeSlots = useMemo(
+    () => generateTimeSlots(businessHours.start, businessHours.end),
+    [businessHours.start, businessHours.end]
+  );
 
   const handleSave = async () => {
     setSaving(true);
@@ -42,6 +75,8 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
       locationType,
       description,
       generatedDates: dates.sort(),
+      startTime,
+      endTime,
     };
     onSave(updated);
   };
@@ -67,7 +102,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-slate-700">
           <h2 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
             <Calendar className="w-5 h-5 text-indigo-500" />
-            Edit Appointment
+            Afspraak bewerken
           </h2>
           <button onClick={onClose} className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
             <X className="w-5 h-5" />
@@ -78,7 +113,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         <div className="p-5 space-y-4">
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Title</label>
+            <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Titel</label>
             <input
               className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white text-sm"
               value={title}
@@ -88,13 +123,13 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
 
           {/* Customer */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Customer</label>
+            <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Klant</label>
             <select
               className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white text-sm"
               value={customerId}
               onChange={e => setCustomerId(e.target.value)}
             >
-              <option value="">Select customer...</option>
+              <option value="">Selecteer klant...</option>
               {customers.map(c => (
                 <option key={c.id} value={c.id}>{c.company ? `${c.company} (${c.name})` : c.name}</option>
               ))}
@@ -109,7 +144,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
               value={serviceId}
               onChange={e => setServiceId(e.target.value)}
             >
-              <option value="">Select service...</option>
+              <option value="">Selecteer service...</option>
               {services.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -119,14 +154,14 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
           {/* Technician */}
           <div>
             <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1 flex items-center gap-1">
-              <UserCog className="w-3.5 h-3.5" /> Technician
+              <UserCog className="w-3.5 h-3.5" /> Technicus
             </label>
             <select
               className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white text-sm"
               value={technicianId}
               onChange={e => setTechnicianId(e.target.value)}
             >
-              <option value="">Unassigned</option>
+              <option value="">Niet toegewezen</option>
               {technicians.map(t => (
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
@@ -135,7 +170,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
 
           {/* Location */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Location</label>
+            <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Locatie</label>
             <div className="flex gap-2 p-1 bg-gray-100 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
               <button
                 onClick={() => setLocationType('ON_SITE')}
@@ -145,7 +180,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                     : 'text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
                 }`}
               >
-                <MapPin className="w-3.5 h-3.5" /> On Site
+                <MapPin className="w-3.5 h-3.5" /> Op locatie
               </button>
               <button
                 onClick={() => setLocationType('REMOTE')}
@@ -160,21 +195,52 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
             </div>
           </div>
 
+          {/* Time Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1 flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" /> Tijdstip
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-slate-500 mb-1">Starttijd</label>
+                <select
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white text-sm"
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                >
+                  {timeSlots.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-slate-500 mb-1">Eindtijd</label>
+                <div className="w-full px-3 py-2 bg-gray-100 dark:bg-slate-950 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-500 dark:text-slate-400 text-sm">
+                  {endTime}
+                  <span className="text-xs text-gray-400 dark:text-slate-600 ml-2">({durationMin} min)</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-400 dark:text-slate-600 mt-1">
+              Werktijden: {businessHours.start} – {businessHours.end}
+            </p>
+          </div>
+
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Notes</label>
+            <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">Notities</label>
             <textarea
               className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white text-sm h-20 resize-none"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="Optional notes..."
+              placeholder="Optionele notities..."
             />
           </div>
 
           {/* Dates */}
           <div>
             <label className="block text-sm font-medium text-gray-600 dark:text-slate-400 mb-2">
-              Scheduled Dates ({dates.length})
+              Geplande datums ({dates.length})
             </label>
             <div className="max-h-40 overflow-y-auto space-y-1 mb-3 custom-scrollbar">
               {dates.map(d => (
@@ -187,7 +253,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                     <button
                       onClick={() => handleRemoveDate(d)}
                       className="text-gray-400 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                      title="Remove date"
+                      title="Datum verwijderen"
                     >
                       <XCircle className="w-4 h-4" />
                     </button>
@@ -207,7 +273,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                 disabled={!newDate}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
               >
-                Add
+                Toevoegen
               </button>
             </div>
           </div>
@@ -219,14 +285,14 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
             onClick={() => onDelete(event.id)}
             className="flex items-center gap-2 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium transition-colors"
           >
-            <Trash2 className="w-4 h-4" /> Delete
+            <Trash2 className="w-4 h-4" /> Verwijderen
           </button>
           <div className="flex gap-2">
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 bg-gray-100 dark:bg-slate-800 rounded-lg transition-colors"
             >
-              Cancel
+              Annuleren
             </button>
             <button
               onClick={handleSave}
@@ -234,7 +300,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
               className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-2 disabled:opacity-50 transition-colors"
             >
               <Save className="w-4 h-4" />
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? 'Opslaan...' : 'Opslaan'}
             </button>
           </div>
         </div>
