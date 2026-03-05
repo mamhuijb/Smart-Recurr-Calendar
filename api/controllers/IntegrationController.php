@@ -88,6 +88,7 @@ class IntegrationController {
 
         switch ($type) {
             case 'office365':
+                Office365Integration::ensureValidToken($config, $db);
                 [$connected, $message] = Office365Integration::test($config);
                 break;
             case 'syncro':
@@ -125,6 +126,18 @@ class IntegrationController {
         $stmt = $db->prepare('SELECT config FROM integration_configs WHERE id = ?');
         $stmt->execute(['office365']);
         $config = json_decode($stmt->fetch()['config'] ?? '{}', true);
+
+        // Auto-set redirectUri if not configured
+        if (empty($config['redirectUri'])) {
+            $origin = Env::get('CORS_ORIGIN', '');
+            if (!$origin || $origin === '*') {
+                // Derive from current request
+                $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $origin = "$proto://$host";
+            }
+            $config['redirectUri'] = $origin . '/api/integrations/office365/callback';
+        }
 
         // Generate and persist a CSRF state token
         $state = bin2hex(random_bytes(16));
@@ -165,6 +178,7 @@ class IntegrationController {
         if ($result['success']) {
             $config['accessToken']  = $result['accessToken'];
             $config['refreshToken'] = $result['refreshToken'] ?? '';
+            $config['expiresAt']    = $result['expiresAt'] ?? (time() + 3600);
             $config['userEmail']    = $result['email'];
             $db->prepare('UPDATE integration_configs SET config = ?, is_connected = 1, last_checked = NOW() WHERE id = ?')
                ->execute([json_encode($config), 'office365']);
@@ -250,6 +264,10 @@ class IntegrationController {
         $o365Stmt->execute(['office365']);
         $o365Config = ($o365Stmt->fetch() ?: []);
         $o365Config = !empty($o365Config['config']) ? json_decode($o365Config['config'], true) : [];
+        // Refresh token if expired
+        if (!empty($o365Config['accessToken'])) {
+            Office365Integration::ensureValidToken($o365Config, $db);
+        }
         $o365Ready = !empty($o365Config['accessToken']);
 
         // Determine send order based on preference
@@ -333,6 +351,82 @@ class IntegrationController {
         $stmt->execute([$id, $to, $subject, $status, $method, $error ?: null]);
     }
 
+    /**
+     * POST /integrations/invoiceninja/sync-customers — fetch clients from InvoiceNinja
+     * and merge into local customers table.
+     */
+    public static function invoiceNinjaSyncCustomers(): void {
+        AuthMiddleware::verify();
+        $db = Database::getInstance();
+
+        // Ensure invoiceninja_id column exists
+        try {
+            $db->query('SELECT invoiceninja_id FROM customers LIMIT 1');
+        } catch (\PDOException $e) {
+            $db->exec('ALTER TABLE customers ADD COLUMN invoiceninja_id VARCHAR(255) DEFAULT NULL');
+            try { $db->exec('CREATE INDEX idx_invoiceninja_id ON customers (invoiceninja_id)'); } catch (\PDOException $e2) {}
+        }
+
+        $stmt = $db->prepare('SELECT config FROM integration_configs WHERE id = ?');
+        $stmt->execute(['invoiceninja']);
+        $row = $stmt->fetch();
+        $config = $row ? json_decode($row['config'], true) : [];
+
+        if (empty($config['apiKey']) || empty($config['endpoint'])) {
+            Response::error('InvoiceNinja not configured. Set API key and endpoint first.', 400);
+            return;
+        }
+
+        $clients = InvoiceNinjaIntegration::getClients($config);
+        if (empty($clients)) {
+            Response::json(['imported' => 0, 'message' => 'No clients found or connection failed.']);
+            return;
+        }
+
+        // Map InvoiceNinja clients to local customer format
+        $imported = 0;
+        foreach ($clients as $client) {
+            $ninjaId = (string) ($client['id'] ?? '');
+            if (!$ninjaId) continue;
+
+            // Check if customer already exists by invoiceninja_id
+            $existing = $db->prepare('SELECT id FROM customers WHERE invoiceninja_id = ?');
+            $existing->execute([$ninjaId]);
+            if ($existing->fetch()) continue;
+
+            // Extract contact info
+            $contacts = $client['contacts'] ?? [];
+            $primaryContact = $contacts[0] ?? [];
+            $name = trim(($primaryContact['first_name'] ?? '') . ' ' . ($primaryContact['last_name'] ?? ''));
+            $email = $primaryContact['email'] ?? '';
+
+            if (!$name && !($client['name'] ?? '')) continue;
+
+            $id = UUID::v4();
+            $insertStmt = $db->prepare('
+                INSERT INTO customers (id, name, email, phone, company, address, postcode, invoiceninja_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ');
+            $insertStmt->execute([
+                $id,
+                $name ?: ($client['name'] ?? 'Unknown'),
+                $email,
+                $primaryContact['phone'] ?? ($client['phone'] ?? ''),
+                $client['name'] ?? '',
+                trim(($client['address1'] ?? '') . ' ' . ($client['address2'] ?? '')),
+                $client['postal_code'] ?? '',
+                $ninjaId,
+            ]);
+            $imported++;
+        }
+
+        Response::json([
+            'imported' => $imported,
+            'total'    => count($clients),
+            'message'  => "Imported {$imported} new customers from InvoiceNinja ({$imported} of " . count($clients) . " were new).",
+        ]);
+    }
+
     public static function syncroCreateTicket(array $body): void {
         AuthMiddleware::verify();
         $db = Database::getInstance();
@@ -357,6 +451,7 @@ class IntegrationController {
         $stmt = $db->prepare('SELECT config FROM integration_configs WHERE id = ?');
         $stmt->execute(['office365']);
         $config = json_decode($stmt->fetch()['config'] ?? '{}', true);
+        Office365Integration::ensureValidToken($config, $db);
 
         $calendars = Office365Integration::getCalendars($config);
         Response::json(['calendars' => $calendars]);
@@ -372,6 +467,7 @@ class IntegrationController {
         $stmt = $db->prepare('SELECT config FROM integration_configs WHERE id = ?');
         $stmt->execute(['office365']);
         $config = json_decode($stmt->fetch()['config'] ?? '{}', true);
+        Office365Integration::ensureValidToken($config, $db);
 
         $calendarId = $body['calendarId'] ?? '';
         $event = [

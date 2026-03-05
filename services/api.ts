@@ -232,6 +232,12 @@ class ApiClient {
     return this.request<{ ticketId: string }>('POST', '/integrations/syncro/tickets', data);
   }
 
+  // ── InvoiceNinja ────────────────────────────────────────────
+
+  invoiceNinjaSyncCustomers() {
+    return this.request<{ imported: number; total: number; message: string }>('POST', '/integrations/invoiceninja/sync-customers');
+  }
+
   // ── Email ──────────────────────────────────────────────────
 
   sendEmail(data: { to: string; subject: string; body: string }) {

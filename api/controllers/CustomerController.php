@@ -2,9 +2,27 @@
 
 class CustomerController {
 
+    // Auto-migrate: add invoiceninja_id column if missing
+    private static function ensureInvoiceNinjaColumn(\PDO $db): void {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+        try {
+            $db->query('SELECT invoiceninja_id FROM customers LIMIT 1');
+        } catch (\PDOException $e) {
+            $db->exec('ALTER TABLE customers ADD COLUMN invoiceninja_id VARCHAR(255) DEFAULT NULL');
+            try {
+                $db->exec('CREATE INDEX idx_invoiceninja_id ON customers (invoiceninja_id)');
+            } catch (\PDOException $e2) {
+                // Index may already exist
+            }
+        }
+    }
+
     public static function index(): void {
         AuthMiddleware::verify();
         $db = Database::getInstance();
+        self::ensureInvoiceNinjaColumn($db);
 
         $customers = $db->query('SELECT * FROM customers ORDER BY company ASC')->fetchAll();
 
@@ -77,15 +95,16 @@ class CustomerController {
 
     private static function toFrontend(array $c): array {
         return [
-            'id'       => $c['id'],
-            'company'  => $c['company'],
-            'name'     => $c['name'],
-            'email'    => $c['email'] ?? '',
-            'phone'    => $c['phone'] ?? '',
-            'address'  => $c['address'] ?? '',
-            'postcode' => $c['postcode'] ?? '',
-            'syncroId' => $c['syncro_id'] ?? '',
-            'assets'   => $c['assets'] ?? [],
+            'id'              => $c['id'],
+            'company'         => $c['company'],
+            'name'            => $c['name'],
+            'email'           => $c['email'] ?? '',
+            'phone'           => $c['phone'] ?? '',
+            'address'         => $c['address'] ?? '',
+            'postcode'        => $c['postcode'] ?? '',
+            'syncroId'        => $c['syncro_id'] ?? '',
+            'invoiceninjaId'  => $c['invoiceninja_id'] ?? '',
+            'assets'          => $c['assets'] ?? [],
         ];
     }
 

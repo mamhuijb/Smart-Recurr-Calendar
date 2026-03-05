@@ -127,6 +127,18 @@ route('POST', '/integrations/email/send',          fn($b, $p) => IntegrationCont
 route('GET',  '/integrations/office365/calendars',  fn($b, $p) => IntegrationController::office365Calendars());
 route('POST', '/integrations/office365/calendar-event', fn($b, $p) => IntegrationController::office365CreateEvent($b));
 route('GET',  '/email-logs',                            fn($b, $p) => IntegrationController::emailLogs());
+route('POST', '/integrations/invoiceninja/sync-customers', fn($b, $p) => IntegrationController::invoiceNinjaSyncCustomers());
+
+// ── Cron (secret-protected) ─────────────────────────────────
+route('GET', '/cron/send-reminders', function () {
+    $cronSecret = Env::get('CRON_SECRET', '');
+    $token = $_GET['token'] ?? '';
+    if (!$cronSecret || !hash_equals($cronSecret, $token)) {
+        Response::error('Forbidden', 403);
+        return;
+    }
+    require_once __DIR__ . '/cron/send-reminders.php';
+});
 
 // ── 404 ─────────────────────────────────────────────────────
 if (!$matched) {

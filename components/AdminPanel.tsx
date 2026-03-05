@@ -230,13 +230,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
     };
 
+    const [syncingInvoiceNinja, setSyncingInvoiceNinja] = useState(false);
+
+    const handleInvoiceNinjaSync = async () => {
+        setSyncingInvoiceNinja(true);
+        try {
+            await api.saveIntegrationConfig('invoiceninja', {
+                apiKey: localSettings.integrations.invoiceNinja.apiKey,
+                endpoint: localSettings.integrations.invoiceNinja.endpoint,
+            });
+            const result = await api.invoiceNinjaSyncCustomers();
+            alert(result.message);
+            const data = await api.getCustomers();
+            onUpdateCustomers(data.customers || []);
+        } catch (e: any) {
+            alert(`Sync failed: ${e.message}`);
+        } finally {
+            setSyncingInvoiceNinja(false);
+        }
+    };
+
     const handleOAuthConnect = async () => {
         try {
-            // Save config first
-            await api.saveIntegrationConfig('office365', {
+            // Save config first (include clientSecret and redirectUri)
+            const o365Save: Record<string, any> = {
                 clientId: localSettings.office365.clientId,
                 tenantId: localSettings.office365.tenantId,
-            });
+                redirectUri: (localSettings.office365 as any).redirectUri || (window.location.origin + '/api/integrations/office365/callback'),
+            };
+            if ((localSettings.office365 as any).clientSecret) {
+                o365Save.clientSecret = (localSettings.office365 as any).clientSecret;
+            }
+            await api.saveIntegrationConfig('office365', o365Save);
 
             const { url } = await api.getOffice365AuthUrl();
             const width = 500, height = 600;
@@ -437,10 +462,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             });
 
             // Save integration configs to database
-            await api.saveIntegrationConfig('office365', {
+            const o365Payload: Record<string, any> = {
                 clientId: localSettings.office365.clientId,
                 tenantId: localSettings.office365.tenantId,
-            });
+                redirectUri: (localSettings.office365 as any).redirectUri || (window.location.origin + '/api/integrations/office365/callback'),
+            };
+            if ((localSettings.office365 as any).clientSecret) {
+                o365Payload.clientSecret = (localSettings.office365 as any).clientSecret;
+            }
+            await api.saveIntegrationConfig('office365', o365Payload);
             await api.saveIntegrationConfig('syncro', {
                 apiKey: localSettings.integrations.syncroApiKey,
                 subdomain: localSettings.integrations.syncroSubdomain,
@@ -748,6 +778,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     Test Connection
                                 </button>
                             </div>
+
+                            <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                                <h4 className="font-bold text-gray-800 dark:text-white mb-2 flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-green-500" />
+                                    Customer Sync
+                                </h4>
+                                <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">
+                                    Import clients from InvoiceNinja into SmartRecur. Existing customers (already imported) will be skipped.
+                                </p>
+                                <button
+                                    onClick={handleInvoiceNinjaSync}
+                                    disabled={syncingInvoiceNinja}
+                                    className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-medium flex items-center gap-2"
+                                >
+                                    {syncingInvoiceNinja ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                    Sync Customers from InvoiceNinja
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -934,6 +982,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             Office 365 Integration
                         </h3>
 
+                        <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-700 dark:text-blue-300">
+                            <p className="font-bold mb-1">Setup Instructions</p>
+                            <ol className="list-decimal ml-4 space-y-1 text-xs">
+                                <li>Go to Azure Portal &rarr; App registrations &rarr; New registration</li>
+                                <li>Set Redirect URI to: <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded">{window.location.origin}/api/integrations/office365/callback</code></li>
+                                <li>Under API Permissions, add: <strong>User.Read, Calendars.ReadWrite, Mail.Send</strong></li>
+                                <li>Under Certificates & Secrets, create a new client secret</li>
+                                <li>Copy the Application ID, Tenant ID, and Client Secret below</li>
+                            </ol>
+                        </div>
+
                         <div className="grid grid-cols-1 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Application (Client) ID</label>
@@ -942,6 +1001,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div>
                                 <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Directory (Tenant) ID</label>
                                 <input className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white" value={localSettings.office365.tenantId} onChange={e => setLocalSettings({ ...localSettings, office365: { ...localSettings.office365, tenantId: e.target.value } })} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 dark:text-slate-400">Client Secret</label>
+                                <input type="password" className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white"
+                                    placeholder="Enter your Azure client secret"
+                                    value={(localSettings.office365 as any).clientSecret || ''}
+                                    onChange={e => setLocalSettings({ ...localSettings, office365: { ...localSettings.office365, clientSecret: e.target.value } as any })}
+                                />
                             </div>
                         </div>
 

@@ -10,7 +10,7 @@ class Office365Integration {
         $tenant   = $config['tenantId'] ?: 'common';
         $clientId = $config['clientId'] ?? '';
         $redirect = $config['redirectUri'] ?? '';
-        $scopes   = 'User.Read Calendars.ReadWrite offline_access';
+        $scopes   = 'User.Read Calendars.ReadWrite Mail.Send offline_access';
 
         if (!$state) {
             $state = bin2hex(random_bytes(16));
@@ -39,7 +39,7 @@ class Office365Integration {
             'code'          => $code,
             'redirect_uri'  => $config['redirectUri'] ?? '',
             'grant_type'    => 'authorization_code',
-            'scope'         => 'User.Read Calendars.ReadWrite offline_access',
+            'scope'         => 'User.Read Calendars.ReadWrite Mail.Send offline_access',
         ], 'application/x-www-form-urlencoded');
 
         if (!isset($response['access_token'])) {
@@ -53,12 +53,70 @@ class Office365Integration {
             $email = $profile['mail'] ?? $profile['userPrincipalName'];
         }
 
+        $expiresAt = time() + ($response['expires_in'] ?? 3600);
+
         return [
             'success'      => true,
             'accessToken'  => $response['access_token'],
             'refreshToken' => $response['refresh_token'] ?? '',
+            'expiresAt'    => $expiresAt,
             'email'        => $email,
         ];
+    }
+
+    /**
+     * Refresh the access token using a stored refresh token.
+     * Returns updated config array with new tokens, or null on failure.
+     */
+    public static function refreshToken(array $config): ?array {
+        $refreshToken = $config['refreshToken'] ?? '';
+        if (!$refreshToken) return null;
+
+        $tenant = $config['tenantId'] ?: 'common';
+        $url = str_replace('{tenant}', $tenant, self::$tokenUrl);
+
+        $response = self::httpPost($url, [
+            'client_id'     => $config['clientId'] ?? '',
+            'client_secret' => $config['clientSecret'] ?? '',
+            'refresh_token' => $refreshToken,
+            'grant_type'    => 'refresh_token',
+            'scope'         => 'User.Read Calendars.ReadWrite Mail.Send offline_access',
+        ], 'application/x-www-form-urlencoded');
+
+        if (!isset($response['access_token'])) return null;
+
+        $config['accessToken']  = $response['access_token'];
+        $config['refreshToken'] = $response['refresh_token'] ?? $refreshToken;
+        $config['expiresAt']    = time() + ($response['expires_in'] ?? 3600);
+
+        return $config;
+    }
+
+    /**
+     * Get a valid access token, refreshing if expired. Persists to DB if refreshed.
+     */
+    public static function ensureValidToken(array &$config, \PDO $db = null): bool {
+        $expiresAt = $config['expiresAt'] ?? 0;
+        $token = $config['accessToken'] ?? '';
+
+        if (!$token) return false;
+
+        // Refresh if expiring within 5 minutes
+        if ($expiresAt && $expiresAt < (time() + 300)) {
+            $refreshed = self::refreshToken($config);
+            if ($refreshed) {
+                $config = $refreshed;
+                // Persist refreshed tokens to DB
+                if ($db) {
+                    $stmt = $db->prepare('UPDATE integration_configs SET config = ? WHERE id = ?');
+                    $stmt->execute([json_encode($config), 'office365']);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        return true;
     }
 
     public static function test(array $config): array {

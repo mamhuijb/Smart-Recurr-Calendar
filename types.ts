@@ -35,7 +35,8 @@ export interface Customer {
   company: string;
   address?: string; 
   postcode?: string;
-  syncroId?: string; 
+  syncroId?: string;
+  invoiceninjaId?: string;
   assets?: Asset[];
 }
 
@@ -121,6 +122,8 @@ export interface AppSettings {
   office365: {
     clientId: string;
     tenantId: string;
+    clientSecret?: string;
+    redirectUri?: string;
     auth: OAuthState;
     selectedCalendarId?: string;
     calendarSyncEnabled?: boolean;
