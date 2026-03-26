@@ -110,10 +110,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding }) =
                   <input
                     type="text"
                     maxLength={6}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
                     className="w-full px-4 py-3 bg-white/60 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl text-gray-900 dark:text-white text-center text-xl tracking-[0.3em] font-mono focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500 outline-none transition-all"
                     placeholder="000000"
                     value={twoFactorCode}
                     onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && twoFactorCode.length === 6) handleSubmit(e); }}
                     autoFocus
                   />
                 </div>
@@ -127,7 +130,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding }) =
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (step === '2FA' && twoFactorCode.length !== 6)}
                 className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-600/25 disabled:opacity-50 press-effect mt-2"
               >
                 {loading ? (

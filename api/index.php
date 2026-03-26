@@ -22,6 +22,8 @@ if ($allowedOrigin === '*') {
 }
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-HTTP-Method-Override');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);

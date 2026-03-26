@@ -103,8 +103,12 @@ CREATE TABLE IF NOT EXISTS events (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_customer (customer_id),
+    INDEX idx_customer_created (customer_id, created_at),
     INDEX idx_service (service_id),
-    INDEX idx_status (status)
+    INDEX idx_status (status),
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE,
+    FOREIGN KEY (technician_id) REFERENCES technicians(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ============================================================
@@ -143,6 +147,24 @@ CREATE TABLE IF NOT EXISTS email_logs (
     error TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_status (status),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- REMINDER LOG (tracks sent reminders to avoid duplicates)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS reminder_log (
+    id VARCHAR(36) PRIMARY KEY,
+    event_id VARCHAR(36) NOT NULL,
+    target_date DATE NOT NULL,
+    reminder_day INT NOT NULL,
+    recipient VARCHAR(255) NOT NULL,
+    status ENUM('sent', 'failed') NOT NULL DEFAULT 'sent',
+    method VARCHAR(20) DEFAULT NULL,
+    error TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_event_date_day (event_id, target_date, reminder_day),
+    INDEX idx_event_id (event_id),
     INDEX idx_created (created_at)
 ) ENGINE=InnoDB;
 

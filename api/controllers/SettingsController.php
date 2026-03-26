@@ -89,13 +89,14 @@ class SettingsController {
             // Restore events
             if (isset($body['data']['events'])) {
                 foreach ($body['data']['events'] as $row) {
-                    $db->prepare('INSERT INTO events (id, title, customer_id, service_id, technician_id, asset_id, syncro_ticket_id, location_type, description, recurrence_rule, generated_dates, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title = VALUES(title), customer_id = VALUES(customer_id), service_id = VALUES(service_id), generated_dates = VALUES(generated_dates), status = VALUES(status)')
+                    $db->prepare('INSERT INTO events (id, title, customer_id, service_id, technician_id, asset_id, syncro_ticket_id, location_type, description, recurrence_rule, generated_dates, start_time, end_time, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title = VALUES(title), customer_id = VALUES(customer_id), service_id = VALUES(service_id), generated_dates = VALUES(generated_dates), start_time = VALUES(start_time), end_time = VALUES(end_time), status = VALUES(status)')
                        ->execute([
                            $row['id'], $row['title'] ?? '', $row['customer_id'] ?? '',
                            $row['service_id'] ?? '', $row['technician_id'] ?? null,
                            $row['asset_id'] ?? null, $row['syncro_ticket_id'] ?? null,
                            $row['location_type'] ?? 'ON_SITE', $row['description'] ?? '',
                            $row['recurrence_rule'] ?? '', $row['generated_dates'] ?? '[]',
+                           $row['start_time'] ?? null, $row['end_time'] ?? null,
                            $row['status'] ?? 'SCHEDULED',
                        ]);
                 }

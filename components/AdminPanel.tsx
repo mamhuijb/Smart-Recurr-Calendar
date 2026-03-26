@@ -4,6 +4,7 @@ import { AppSettings, Customer, Service, Technician, RecurrenceEvent } from '../
 import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone, Loader2, Mail, Send, FileText, Plus, BellRing } from 'lucide-react';
 import { api } from '../services/api';
 import { notificationManager } from '../utils/notificationManager';
+import { toast } from '../utils/toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateSecret, generateTotpUri } from '../utils/authSecurity';
 
@@ -225,9 +226,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             }
 
             onUpdateCustomers([...customers, ...newCusts]);
-            alert(`Successfully imported ${newCusts.length} new customers from SyncroMSP.`);
+            toast.success(`Successfully imported ${newCusts.length} new customers from SyncroMSP.`);
         } catch (e: any) {
-            alert(`Import failed: ${e.message}`);
+            toast.error(`Import failed: ${e.message}`);
         }
     };
 
@@ -241,11 +242,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 endpoint: localSettings.integrations.invoiceNinja.endpoint,
             });
             const result = await api.invoiceNinjaSyncCustomers();
-            alert(result.message);
+            toast.success(result.message);
             const data = await api.getCustomers();
             onUpdateCustomers(data.customers || []);
         } catch (e: any) {
-            alert(`Sync failed: ${e.message}`);
+            toast.error(`Sync failed: ${e.message}`);
         } finally {
             setSyncingInvoiceNinja(false);
         }
@@ -270,7 +271,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             const top = window.screen.height / 2 - height / 2;
             const popup = window.open(url, 'Office 365 Login', `width=${width},height=${height},top=${top},left=${left}`);
 
-            if (!popup) { alert('Popup blocked. Please allow popups.'); return; }
+            if (!popup) { toast.error('Popup blocked. Please allow popups.'); return; }
 
             const handler = (event: MessageEvent) => {
                 if (event.origin !== window.location.origin) return;
@@ -282,16 +283,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         office365: { ...prev.office365, auth: { isConnected: true, userEmail: event.data.email } }
                     }));
                     setIntegrationStatus(prev => ({ ...prev, office365: { isConnected: true, lastChecked: new Date().toISOString() } }));
-                    alert('Connected to Office 365!');
+                    toast.success('Connected to Office 365!');
                 } else if (event.data.type === 'OAUTH_ERROR') {
                     window.removeEventListener('message', handler);
                     popup.close();
-                    alert(`Auth failed: ${event.data.error}`);
+                    toast.error(`Auth failed: ${event.data.error}`);
                 }
             };
             window.addEventListener('message', handler);
         } catch (e: any) {
-            alert(`Auth failed: ${e.message}`);
+            toast.error(`Auth failed: ${e.message}`);
         }
     };
 
@@ -306,7 +307,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             a.click();
             URL.revokeObjectURL(url);
         } catch (e: any) {
-            alert(`Backup failed: ${e.message}`);
+            toast.error(`Backup failed: ${e.message}`);
         }
     };
 
@@ -319,10 +320,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             try {
                 const json = JSON.parse(event.target?.result as string);
                 await api.importBackup(json);
-                alert("Database restored successfully! The application will now reload.");
-                window.location.reload();
+                toast.success("Database restored successfully! Reloading...");
+                setTimeout(() => window.location.reload(), 1500);
             } catch (err) {
-                alert("Failed to restore backup. Invalid file format.");
+                toast.error("Failed to restore backup. Invalid file format.");
             }
         };
         reader.readAsText(file);
@@ -371,13 +372,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 ...prev,
                 [type]: { isConnected: result.isConnected, lastChecked: new Date().toISOString(), message: result.message }
             }));
-            alert(result.message);
+            if (result.isConnected) {
+                toast.success(result.message);
+            } else {
+                toast.error(result.message);
+            }
         } catch (e: any) {
             setIntegrationStatus(prev => ({
                 ...prev,
                 [type]: { isConnected: false, lastChecked: new Date().toISOString(), message: e.message }
             }));
-            alert(`Connection test failed: ${e.message}`);
+            toast.error(`Connection test failed: ${e.message}`);
         } finally {
             setTestingIntegration(null);
         }
@@ -397,7 +402,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         try {
             await api.createService(s);
         } catch (e: any) {
-            alert(`Failed to save service: ${e.message}`);
+            toast.error(`Failed to save service: ${e.message}`);
             return;
         }
         onUpdateServices([...services, s]);
@@ -416,7 +421,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         try {
             await api.createTechnician(t);
         } catch (e: any) {
-            alert(`Failed to save technician: ${e.message}`);
+            toast.error(`Failed to save technician: ${e.message}`);
             return;
         }
         onUpdateTechnicians([...technicians, t]);
@@ -425,7 +430,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const handleAddCustomer = async () => {
         if (!newCustomer.name) {
-            alert("Contact Name is required.");
+            toast.error("Contact Name is required.");
             return;
         }
         const c: Customer = {
@@ -441,7 +446,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         try {
             await api.createCustomer(c);
         } catch (e: any) {
-            alert(`Failed to save customer: ${e.message}`);
+            toast.error(`Failed to save customer: ${e.message}`);
             return;
         }
         onUpdateCustomers([...customers, c]);
@@ -500,9 +505,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             await api.saveIntegrationConfig('smtp', smtpPayload);
 
             onUpdateSettings(localSettings);
-            alert("Configuration saved.");
+            toast.success("Configuration saved.");
         } catch (e: any) {
-            alert(`Save failed: ${e.message}`);
+            toast.error(`Save failed: ${e.message}`);
         }
     };
 
@@ -1588,13 +1593,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     }, []);
 
                     const handleSubscribe = async () => {
-                        if (!vapidKey) { alert('VAPID key not configured. Save settings first.'); return; }
+                        if (!vapidKey) { toast.error('VAPID key not configured. Save settings first.'); return; }
                         setSubscribing(true);
                         const ok = await notificationManager.requestPermissionAndSubscribe(vapidKey);
                         setPushPermission(notificationManager.permission);
                         setSubscribing(false);
-                        if (ok) alert('Push notifications enabled!');
-                        else if (notificationManager.permission === 'denied') alert('Notifications were blocked. Check your browser settings.');
+                        if (ok) toast.success('Push notifications enabled!');
+                        else if (notificationManager.permission === 'denied') toast.error('Notifications were blocked. Check your browser settings.');
                     };
 
                     const handleUnsubscribe = async () => {
@@ -1608,8 +1613,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         setTesting(true);
                         try {
                             const res = await api.testPushNotification();
-                            alert(`Test sent to ${(res as any).sent || 0} device(s).`);
-                        } catch (e: any) { alert(`Test failed: ${e.message}`); }
+                            toast.success(`Test sent to ${(res as any).sent || 0} device(s).`);
+                        } catch (e: any) { toast.error(`Test failed: ${e.message}`); }
                         finally { setTesting(false); }
                     };
 
@@ -1618,8 +1623,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             await api.updateSettings({
                                 pushNotifications: { enabled: pushEnabled, timings: pushTimings }
                             });
-                            alert('Push notification settings saved.');
-                        } catch (e: any) { alert(`Save failed: ${e.message}`); }
+                            toast.success('Push notification settings saved.');
+                        } catch (e: any) { toast.error(`Save failed: ${e.message}`); }
                     };
 
                     const toggleTiming = (minutes: number) => {

@@ -54,8 +54,9 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
   const timeSlots = useMemo(() => generateTimeSlots(businessHours.start, businessHours.end), [businessHours.start, businessHours.end]);
 
   const handleSave = async () => {
+    if (!title.trim()) return;
     setSaving(true);
-    onSave({ ...event, title, customerId, serviceId, technicianId: technicianId || undefined, locationType, description, generatedDates: dates.sort(), startTime, endTime });
+    onSave({ ...event, title: title.trim(), customerId, serviceId, technicianId: technicianId || undefined, locationType, description, generatedDates: dates.sort(), startTime, endTime });
   };
 
   const handleRemoveDate = (dateStr: string) => setDates(dates.filter(d => d !== dateStr));
@@ -205,7 +206,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || !customerId || !serviceId || dates.length === 0}
+              disabled={saving || !title.trim() || !customerId || !serviceId || dates.length === 0}
               className="px-4 py-2 text-[13px] font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl flex items-center gap-1.5 disabled:opacity-50 transition-all press-effect shadow-sm shadow-primary-600/20"
             >
               <Save className="w-4 h-4" />

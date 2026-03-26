@@ -170,7 +170,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   security: {
       twoFactorEnabled: false,
-      twoFactorSecret: 'JBSWY3DPEHPK3PXP' // Mock Base32 secret
+      twoFactorSecret: '' // Generated server-side only
   },
   office365: {
     clientId: '',

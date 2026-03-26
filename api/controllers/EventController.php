@@ -10,7 +10,16 @@ class EventController {
         try {
             $db->query('SELECT start_time FROM events LIMIT 1');
         } catch (\PDOException $e) {
-            $db->exec('ALTER TABLE events ADD COLUMN start_time VARCHAR(5) DEFAULT NULL, ADD COLUMN end_time VARCHAR(5) DEFAULT NULL');
+            // Use IGNORE-style approach: check INFORMATION_SCHEMA to avoid race conditions
+            $col = $db->prepare("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'events' AND COLUMN_NAME = 'start_time'");
+            $col->execute();
+            if (!$col->fetch()) {
+                try {
+                    $db->exec('ALTER TABLE events ADD COLUMN start_time VARCHAR(5) DEFAULT NULL, ADD COLUMN end_time VARCHAR(5) DEFAULT NULL');
+                } catch (\PDOException $e2) {
+                    // Column may have been added by a concurrent request
+                }
+            }
         }
     }
 

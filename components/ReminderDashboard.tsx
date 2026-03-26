@@ -35,7 +35,7 @@ export const ReminderDashboard: React.FC<ReminderDashboardProps> = ({
           body = body.replace('{service_name}', service.name);
           body = body.replace('{date}', dateStr);
           body = body.replace('{company_name}', customer.company);
-          reminders.push({ eventId: event.id, eventTitle: event.title, customerName: customer.company, targetDate: dateStr, daysUntil: diffDays, emailBody: body });
+          reminders.push({ eventId: event.id, eventTitle: event.title, customerName: customer.name || customer.company, targetDate: dateStr, daysUntil: diffDays, emailBody: body });
         }
       });
     });

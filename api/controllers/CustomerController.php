@@ -26,11 +26,20 @@ class CustomerController {
 
         $customers = $db->query('SELECT * FROM customers ORDER BY company ASC')->fetchAll();
 
-        // Attach assets
-        $result = array_map(function ($c) use ($db) {
-            $stmt = $db->prepare('SELECT id, name, type FROM assets WHERE customer_id = ?');
-            $stmt->execute([$c['id']]);
-            $c['assets'] = $stmt->fetchAll();
+        // Attach assets in a single query to avoid N+1
+        $customerIds = array_column($customers, 'id');
+        $assetsMap = [];
+        if (!empty($customerIds)) {
+            $placeholders = implode(',', array_fill(0, count($customerIds), '?'));
+            $stmt = $db->prepare("SELECT id, name, type, customer_id FROM assets WHERE customer_id IN ({$placeholders})");
+            $stmt->execute($customerIds);
+            foreach ($stmt->fetchAll() as $asset) {
+                $assetsMap[$asset['customer_id']][] = $asset;
+            }
+        }
+
+        $result = array_map(function ($c) use ($assetsMap) {
+            $c['assets'] = $assetsMap[$c['id']] ?? [];
             return self::toFrontend($c);
         }, $customers);
 
@@ -39,6 +48,12 @@ class CustomerController {
 
     public static function store(array $body): void {
         AuthMiddleware::verify();
+
+        $email = $body['email'] ?? '';
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            Response::error('Invalid email address', 400);
+            return;
+        }
 
         $id = $body['id'] ?? UUID::v4();
         $db = Database::getInstance();
@@ -63,6 +78,13 @@ class CustomerController {
 
     public static function update(string $id, array $body): void {
         AuthMiddleware::verify();
+
+        $email = $body['email'] ?? '';
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            Response::error('Invalid email address', 400);
+            return;
+        }
+
         $db = Database::getInstance();
 
         $stmt = $db->prepare('

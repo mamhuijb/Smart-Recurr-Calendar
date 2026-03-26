@@ -69,4 +69,4 @@ RewriteRule ^(.*)$ app.html [L]
 RewriteRule (^|/)\.(?!htaccess|well-known) - [F]
 
 # Block direct access to source/config directories
-RewriteRule ^(database|node_modules|components|services|utils|dist|src)/ - [F]
+RewriteRule ^(database|node_modules|components|services|utils|src)/ - [F]

@@ -281,17 +281,25 @@ class IntegrationController {
         $error = '';
 
         foreach ($tryOrder as $try) {
-            if ($try === 'smtp' && $smtpReady) {
-                $result = SmtpMailer::send($smtpConfig, $to, $subject, $emailBody);
-                $method = 'smtp';
-                $success = $result['success'];
-                $error = $result['error'] ?? '';
-                break;
-            } elseif ($try === 'office365' && $o365Ready) {
-                $result = Office365Integration::sendMail($o365Config, $to, $subject, $emailBody);
-                $method = 'office365';
-                $success = $result['success'];
-                $error = $result['error'] ?? '';
+            try {
+                if ($try === 'smtp' && $smtpReady) {
+                    $result = SmtpMailer::send($smtpConfig, $to, $subject, $emailBody);
+                    $method = 'smtp';
+                    $success = $result['success'];
+                    $error = $result['error'] ?? '';
+                    break;
+                } elseif ($try === 'office365' && $o365Ready) {
+                    $result = Office365Integration::sendMail($o365Config, $to, $subject, $emailBody);
+                    $method = 'office365';
+                    $success = $result['success'];
+                    $error = $result['error'] ?? '';
+                    break;
+                }
+            } catch (\Exception $e) {
+                $method = $try;
+                $success = false;
+                $error = $e->getMessage();
+                error_log("SmartRecur email send error ({$try}): " . $e->getMessage());
                 break;
             }
         }
@@ -335,17 +343,6 @@ class IntegrationController {
     }
 
     private static function logEmail(\PDO $db, string $to, string $subject, string $status, string $method, string $error = ''): void {
-        // Ensure table exists
-        $db->exec('CREATE TABLE IF NOT EXISTS email_logs (
-            id VARCHAR(36) PRIMARY KEY,
-            recipient VARCHAR(255) NOT NULL,
-            subject VARCHAR(500) NOT NULL,
-            status ENUM(\'sent\', \'failed\') NOT NULL DEFAULT \'sent\',
-            method VARCHAR(20) NOT NULL DEFAULT \'smtp\',
-            error TEXT DEFAULT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB');
-
         $id = UUID::v4();
         $stmt = $db->prepare('INSERT INTO email_logs (id, recipient, subject, status, method, error) VALUES (?, ?, ?, ?, ?, ?)');
         $stmt->execute([$id, $to, $subject, $status, $method, $error ?: null]);

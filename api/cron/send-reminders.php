@@ -119,7 +119,8 @@ foreach ($services as $s) $serviceMap[$s['id']] = $s;
 $techMap = [];
 foreach ($technicians as $t) $techMap[$t['id']] = $t;
 
-$today = new DateTimeImmutable('today', new DateTimeZone('Europe/Amsterdam'));
+$timezone = Env::get('TIMEZONE', 'Europe/Amsterdam');
+$today = new DateTimeImmutable('today', new DateTimeZone($timezone));
 $sentCount = 0;
 $failCount = 0;
 
@@ -165,7 +166,7 @@ foreach ($events as $event) {
     }
 
     foreach ($dates as $dateStr) {
-        $eventDate = new DateTimeImmutable($dateStr, new DateTimeZone('Europe/Amsterdam'));
+        $eventDate = new DateTimeImmutable($dateStr, new DateTimeZone($timezone));
         $diffDays = (int) $today->diff($eventDate)->format('%r%a');
 
         // Only future or today

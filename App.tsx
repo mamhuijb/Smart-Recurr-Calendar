@@ -110,26 +110,36 @@ const App: React.FC = () => {
             description: `Customer: ${customer?.company || 'N/A'}\nService: ${service?.name || 'N/A'}\nTechnician: ${tech?.name || 'N/A'}\nLocation: ${event.locationType}`,
             startDateTime: `${dateStr}T${evStart}:00`,
             endDateTime: `${dateStr}T${evEnd}:00`,
-          }).catch(() => {});
+          }).catch((err) => {
+            console.error('Office 365 sync failed for date ' + dateStr, err);
+          });
         }
       }
-    } catch {
-      setEvents([...events, event]);
+    } catch (err) {
+      console.error('Failed to save event:', err);
     }
     setViewMode(ViewMode.CALENDAR);
     setInitialRule('');
   };
 
   const handleUpdateEvent = async (event: RecurrenceEvent) => {
-    try { await api.updateEvent(event.id, event); } catch {}
-    setEvents(events.map(e => e.id === event.id ? event : e));
+    try {
+      await api.updateEvent(event.id, event);
+      setEvents(events.map(e => e.id === event.id ? event : e));
+    } catch (err) {
+      console.error('Failed to update event:', err);
+    }
     setEditingEvent(null);
   };
 
   const handleDeleteEvent = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this appointment?')) {
-      try { await api.deleteEvent(id); } catch {}
-      setEvents(events.filter(e => e.id !== id));
+      try {
+        await api.deleteEvent(id);
+        setEvents(events.filter(e => e.id !== id));
+      } catch (err) {
+        console.error('Failed to delete event:', err);
+      }
       setEditingEvent(null);
     }
   };
