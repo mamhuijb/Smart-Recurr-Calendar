@@ -1,8 +1,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppSettings, Customer, Service, Technician, RecurrenceEvent } from '../types';
-import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone, Loader2, Mail, Send, FileText, Plus } from 'lucide-react';
+import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone, Loader2, Mail, Send, FileText, Plus, BellRing } from 'lucide-react';
 import { api } from '../services/api';
+import { notificationManager } from '../utils/notificationManager';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateSecret, generateTotpUri } from '../utils/authSecurity';
 
@@ -25,7 +26,7 @@ interface AdminPanelProps {
     onClose: () => void;
 }
 
-type Tab = 'REPORTS' | 'BRANDING' | 'OAUTH' | 'SMTP' | 'INTEGRATIONS' | 'INVOICENINJA' | 'ZOHO' | 'SERVICES' | 'TECHS' | 'CUSTOMERS' | 'BUSINESS' | 'NOTIFICATIONS' | 'EMAIL_LOGS' | 'BACKUP' | 'SECURITY';
+type Tab = 'REPORTS' | 'BRANDING' | 'OAUTH' | 'SMTP' | 'INTEGRATIONS' | 'INVOICENINJA' | 'ZOHO' | 'SERVICES' | 'TECHS' | 'CUSTOMERS' | 'BUSINESS' | 'NOTIFICATIONS' | 'PUSH_NOTIFICATIONS' | 'EMAIL_LOGS' | 'BACKUP' | 'SECURITY';
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
     settings,
@@ -581,6 +582,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <div className="px-2 pb-1 pt-4 text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-wider">System</div>
                     <button onClick={() => setActiveTab('NOTIFICATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'NOTIFICATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <Bell className="w-4 h-4" /> Email & Reminders
+                    </button>
+                    <button onClick={() => setActiveTab('PUSH_NOTIFICATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'PUSH_NOTIFICATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
+                        <BellRing className="w-4 h-4" /> Push Notifications
                     </button>
                     <button onClick={() => { setActiveTab('EMAIL_LOGS'); if (emailLogs.length === 0) { setLoadingLogs(true); api.getEmailLogs().then(r => setEmailLogs(r.logs || [])).catch(() => {}).finally(() => setLoadingLogs(false)); } }} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'EMAIL_LOGS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <FileText className="w-4 h-4" /> Email Logs
@@ -1561,6 +1565,187 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                     </div>
                 )}
+
+                {/* PUSH NOTIFICATIONS Tab */}
+                {activeTab === 'PUSH_NOTIFICATIONS' && (() => {
+                    const [pushEnabled, setPushEnabled] = React.useState(false);
+                    const [pushTimings, setPushTimings] = React.useState<number[]>([15, 60, 1440]);
+                    const [vapidKey, setVapidKey] = React.useState('');
+                    const [pushSupported] = React.useState(notificationManager.isSupported);
+                    const [pushPermission, setPushPermission] = React.useState(notificationManager.permission);
+                    const [subscribing, setSubscribing] = React.useState(false);
+                    const [testing, setTesting] = React.useState(false);
+                    const [pushLoaded, setPushLoaded] = React.useState(false);
+
+                    React.useEffect(() => {
+                        notificationManager.init();
+                        api.getPushConfig().then(res => {
+                            setVapidKey(res.vapidPublicKey || '');
+                            setPushEnabled(res.enabled);
+                            setPushTimings(res.timings || [15, 60, 1440]);
+                            setPushLoaded(true);
+                        }).catch(() => setPushLoaded(true));
+                    }, []);
+
+                    const handleSubscribe = async () => {
+                        if (!vapidKey) { alert('VAPID key not configured. Save settings first.'); return; }
+                        setSubscribing(true);
+                        const ok = await notificationManager.requestPermissionAndSubscribe(vapidKey);
+                        setPushPermission(notificationManager.permission);
+                        setSubscribing(false);
+                        if (ok) alert('Push notifications enabled!');
+                        else if (notificationManager.permission === 'denied') alert('Notifications were blocked. Check your browser settings.');
+                    };
+
+                    const handleUnsubscribe = async () => {
+                        setSubscribing(true);
+                        await notificationManager.unsubscribe();
+                        setPushPermission(notificationManager.permission);
+                        setSubscribing(false);
+                    };
+
+                    const handleTestPush = async () => {
+                        setTesting(true);
+                        try {
+                            const res = await api.testPushNotification();
+                            alert(`Test sent to ${(res as any).sent || 0} device(s).`);
+                        } catch (e: any) { alert(`Test failed: ${e.message}`); }
+                        finally { setTesting(false); }
+                    };
+
+                    const handleSavePushSettings = async () => {
+                        try {
+                            await api.updateSettings({
+                                pushNotifications: { enabled: pushEnabled, timings: pushTimings }
+                            });
+                            alert('Push notification settings saved.');
+                        } catch (e: any) { alert(`Save failed: ${e.message}`); }
+                    };
+
+                    const toggleTiming = (minutes: number) => {
+                        setPushTimings(prev => prev.includes(minutes) ? prev.filter(t => t !== minutes) : [...prev, minutes].sort((a, b) => a - b));
+                    };
+
+                    const timingOptions = [
+                        { label: '15 minutes before', value: 15 },
+                        { label: '30 minutes before', value: 30 },
+                        { label: '1 hour before', value: 60 },
+                        { label: '2 hours before', value: 120 },
+                        { label: '1 day before', value: 1440 },
+                        { label: '2 days before', value: 2880 },
+                        { label: '1 week before', value: 10080 },
+                    ];
+
+                    return (
+                    <div className="space-y-6 max-w-2xl animate-fade-in">
+                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white border-b border-gray-200 dark:border-slate-700 pb-4 flex items-center gap-2">
+                            <BellRing className="w-6 h-6 text-primary-500" />
+                            Push Notifications
+                        </h3>
+
+                        {/* Browser support check */}
+                        {!pushSupported && (
+                            <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">
+                                Your browser does not support push notifications. Use Chrome, Firefox, or Edge for this feature.
+                            </div>
+                        )}
+
+                        {/* Enable/Disable toggle */}
+                        <div className="p-5 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h4 className="font-bold text-gray-800 dark:text-white">Enable Push Notifications</h4>
+                                    <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                                        Receive browser notifications for upcoming appointments.
+                                    </p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked={pushEnabled} onChange={e => setPushEnabled(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500/30 dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:bg-primary-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all rounded-full"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Subscription status */}
+                        {pushSupported && (
+                            <div className="p-5 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 space-y-4">
+                                <h4 className="font-bold text-gray-800 dark:text-white">Device Registration</h4>
+
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-3 h-3 rounded-full ${pushPermission === 'granted' && notificationManager.isSubscribed ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : pushPermission === 'denied' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                                    <span className="text-sm text-gray-600 dark:text-slate-300">
+                                        {pushPermission === 'granted' && notificationManager.isSubscribed ? 'This device is subscribed to push notifications.'
+                                         : pushPermission === 'denied' ? 'Notifications are blocked in browser settings.'
+                                         : 'This device is not registered for push notifications.'}
+                                    </span>
+                                </div>
+
+                                <div className="flex gap-2 flex-wrap">
+                                    {pushPermission !== 'denied' && !notificationManager.isSubscribed && (
+                                        <button onClick={handleSubscribe} disabled={subscribing} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+                                            {subscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
+                                            Enable on this device
+                                        </button>
+                                    )}
+                                    {notificationManager.isSubscribed && (
+                                        <button onClick={handleUnsubscribe} disabled={subscribing} className="bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+                                            {subscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                            Unsubscribe
+                                        </button>
+                                    )}
+                                    <button onClick={handleTestPush} disabled={testing || !notificationManager.isSubscribed} className="bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2">
+                                        {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                        Send Test
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Timing settings */}
+                        <div className="p-5 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 space-y-4">
+                            <h4 className="font-bold text-gray-800 dark:text-white">Notification Timing</h4>
+                            <p className="text-sm text-gray-500 dark:text-slate-400">
+                                Choose when to send push notifications before an appointment starts.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {timingOptions.map(opt => (
+                                    <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                                        pushTimings.includes(opt.value)
+                                            ? 'bg-primary-50 dark:bg-primary-900/15 border-primary-300 dark:border-primary-600/40 text-primary-700 dark:text-primary-300'
+                                            : 'bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:border-gray-300'
+                                    }`}>
+                                        <input type="checkbox" checked={pushTimings.includes(opt.value)} onChange={() => toggleTiming(opt.value)}
+                                            className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500" />
+                                        <span className="text-sm font-medium">{opt.label}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Server-side setup info */}
+                        <div className="p-5 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-xl text-sm text-blue-700 dark:text-blue-300 space-y-3">
+                            <h4 className="font-bold">Server-Side Setup</h4>
+                            <p>Push notifications are sent by the cron job at the configured timings. Ensure:</p>
+                            <ol className="list-decimal ml-4 space-y-1 text-xs">
+                                <li>Cron job is running: <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded">php api/cron/send-reminders.php</code></li>
+                                <li>Run frequency: every 15 minutes (to match notification timing)</li>
+                                <li>VAPID keys are auto-generated on first use (stored in database)</li>
+                                <li>For HTTPS: push notifications require a secure context (HTTPS)</li>
+                            </ol>
+                            {vapidKey && (
+                                <div className="mt-2">
+                                    <p className="text-xs font-medium">VAPID Public Key:</p>
+                                    <code className="block text-[10px] bg-blue-100 dark:bg-blue-900/30 p-2 rounded mt-1 break-all">{vapidKey}</code>
+                                </div>
+                            )}
+                        </div>
+
+                        <button onClick={handleSavePushSettings} className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-medium flex items-center gap-2 shadow-sm">
+                            <Save className="w-4 h-4" /> Save Push Settings
+                        </button>
+                    </div>
+                    );
+                })()}
 
                 {/* EMAIL LOGS Tab */}
                 {activeTab === 'EMAIL_LOGS' && (

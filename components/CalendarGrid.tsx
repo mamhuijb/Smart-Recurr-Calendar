@@ -18,23 +18,14 @@ interface CalendarGridProps {
 }
 
 export const CalendarGrid: React.FC<CalendarGridProps> = ({
-  events,
-  technicians,
-  displayDate,
-  holidays,
-  manualClosures = [],
+  events, technicians, displayDate, holidays, manualClosures = [],
   businessHours = { start: '09:00', end: '17:00', closedDays: [0] },
-  calendarView,
-  onCalendarViewChange,
-  onPrev,
-  onNext,
-  onDayClick,
-  onEventClick
+  calendarView, onCalendarViewChange, onPrev, onNext, onDayClick, onEventClick
 }) => {
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year: number, month: number) => {
-      const day = new Date(year, month, 1).getDay();
-      return (day + 6) % 7;
+    const day = new Date(year, month, 1).getDay();
+    return (day + 6) % 7;
   };
 
   const locale = 'nl-NL';
@@ -47,31 +38,27 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   };
 
   const checkStatus = (y: number, m: number, d: number) => {
-      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const jsDay = new Date(y, m, d).getDay();
-
-      const isHoliday = holidays.includes(dateStr);
-      const isManualClosed = manualClosures.includes(dateStr);
-      const isClosedDay = businessHours.closedDays.includes(jsDay);
-
-      return { isHoliday, isManualClosed, isClosedDay };
-  }
+    const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const jsDay = new Date(y, m, d).getDay();
+    return {
+      isHoliday: holidays.includes(dateStr),
+      isManualClosed: manualClosures.includes(dateStr),
+      isClosedDay: businessHours.closedDays.includes(jsDay),
+    };
+  };
 
   const getTechColor = (id?: string) => {
-      const t = technicians.find(tech => tech.id === id);
-      return t ? t.color : '#475569';
-  }
+    const t = technicians.find(tech => tech.id === id);
+    return t ? t.color : '#94a3b8';
+  };
 
-  // Weekdays header
   const weekDaysFull = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
   const weekDaysMobile = ['M', 'D', 'W', 'D', 'V', 'Z', 'Z'];
 
-  // Week view: get the Monday of the current week
   const getWeekStart = (date: Date) => {
     const d = new Date(date);
     const day = d.getDay();
-    const diff = (day === 0 ? -6 : 1) - day; // Monday = 1
-    d.setDate(d.getDate() + diff);
+    d.setDate(d.getDate() + ((day === 0 ? -6 : 1) - day));
     d.setHours(0, 0, 0, 0);
     return d;
   };
@@ -83,12 +70,11 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     return d;
   });
 
-  // Header text
   const headerText = calendarView === 'month'
     ? displayDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
     : `${weekDays[0].toLocaleDateString(locale, { day: 'numeric', month: 'short' })} – ${weekDays[6].toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
-  // Render a day cell for month view
+  // Month day cell
   const renderMonthDay = (day: number) => {
     const dayEvents = getEventsForDay(year, month, day);
     const currentDayDate = new Date(year, month, day);
@@ -100,83 +86,73 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       <div
         key={day}
         onClick={() => !isClosed && onDayClick(currentDayDate)}
-        className={`group relative min-h-[36px] sm:min-h-[48px] md:aspect-square p-0.5 sm:p-1 md:p-2 border rounded sm:rounded-lg flex flex-col items-start transition-all
+        className={`group relative min-h-[38px] sm:min-h-[52px] md:aspect-square p-0.5 sm:p-1.5 md:p-2 rounded-xl flex flex-col items-start transition-all duration-200
           ${isClosed
-              ? 'bg-slate-950/50 border-slate-800 cursor-not-allowed opacity-60'
-              : 'bg-slate-800 border-slate-700 cursor-pointer hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-900/20'
+            ? 'bg-gray-100/60 dark:bg-slate-900/40 cursor-not-allowed opacity-50'
+            : 'bg-white dark:bg-slate-800/40 cursor-pointer hover:bg-primary-50/50 dark:hover:bg-primary-900/10 hover:shadow-card-hover border border-transparent hover:border-primary-200/60 dark:hover:border-primary-700/30'
           }
-          ${isToday ? 'ring-1 sm:ring-2 ring-indigo-500 ring-offset-1 sm:ring-offset-2 ring-offset-slate-900' : ''}
-          ${isClosed ? 'bg-[url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjMGUxNzJhIi8+CjxwYXRoIGQ9Ik0wIDBMNCA0IiBzdHJva2U9IiMxZTI5M2IiIHN0cm9rZS13aWR0aD0iMSIvPgo8L3N2Zz4=")]' : ''}
+          ${!isClosed ? 'border border-gray-100 dark:border-slate-800/60' : 'border border-transparent'}
+          ${isToday ? 'ring-2 ring-primary-500 ring-offset-1 ring-offset-gray-50 dark:ring-offset-slate-900 shadow-sm' : ''}
         `}
       >
         <div className="flex justify-between w-full">
-            <span className={`text-xs sm:text-sm font-medium w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full ${
-              isToday ? 'bg-indigo-600 text-white' : isClosed ? 'text-slate-600' : 'text-slate-300 group-hover:bg-slate-700'
-            }`}>
-              {day}
-            </span>
-            {isHoliday && <span title="Holiday"><AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-red-500" /></span>}
-            {(isManualClosed || isClosedDay) && !isHoliday && <span title="Closed"><Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-600" /></span>}
+          <span className={`text-xs sm:text-[13px] font-medium w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-lg
+            ${isToday ? 'bg-primary-600 text-white font-semibold' : isClosed ? 'text-gray-400 dark:text-slate-600' : 'text-gray-700 dark:text-slate-300'}
+          `}>
+            {day}
+          </span>
+          {isHoliday && <AlertCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-red-400" />}
+          {(isManualClosed || isClosedDay) && !isHoliday && <Lock className="w-2.5 h-2.5 text-gray-400 dark:text-slate-600" />}
         </div>
 
-        {/* Event indicators */}
         {!isClosed && dayEvents.length > 0 && (
           <>
-            {/* Mobile: colored dots */}
-            <div className="flex gap-0.5 mt-0.5 flex-wrap sm:hidden">
+            {/* Mobile dots */}
+            <div className="flex gap-0.5 mt-1 flex-wrap sm:hidden">
               {dayEvents.slice(0, 4).map(ev => (
-                <div
-                  key={ev.id}
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: getTechColor(ev.technicianId) }}
-                  title={ev.title}
-                />
+                <div key={ev.id} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getTechColor(ev.technicianId) }} title={ev.title} />
               ))}
-              {dayEvents.length > 4 && (
-                <span className="text-[8px] text-slate-500">+{dayEvents.length - 4}</span>
-              )}
+              {dayEvents.length > 4 && <span className="text-[8px] text-gray-400">+{dayEvents.length - 4}</span>}
             </div>
 
-            {/* Desktop: event cards */}
-            <div className="hidden sm:flex flex-1 w-full flex-col gap-0.5 md:gap-1 mt-0.5 md:mt-1 overflow-hidden">
+            {/* Desktop cards */}
+            <div className="hidden sm:flex flex-1 w-full flex-col gap-0.5 md:gap-1 mt-1 overflow-hidden">
               {dayEvents.slice(0, 3).map(ev => (
-              <div
+                <div
                   key={ev.id}
                   onClick={(e) => { e.stopPropagation(); onEventClick(ev); }}
-                  className="flex items-center gap-0.5 md:gap-1 text-[9px] md:text-[10px] leading-tight truncate px-1 md:px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium w-full border-l-2 cursor-pointer transition-colors"
-                  style={{ borderLeftColor: getTechColor(ev.technicianId)}}
+                  className="flex items-center gap-1 text-[9px] md:text-[10px] leading-tight truncate px-1.5 py-0.5 rounded-md bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 font-medium w-full border-l-2 cursor-pointer transition-colors"
+                  style={{ borderLeftColor: getTechColor(ev.technicianId) }}
                   title={`Click to edit: ${ev.title}`}
-              >
+                >
                   {ev.locationType === 'REMOTE' ? (
-                      <Headset className="w-2.5 h-2.5 md:w-3 md:h-3 text-slate-400 flex-shrink-0" />
+                    <Headset className="w-2.5 h-2.5 text-gray-400 dark:text-slate-400 flex-shrink-0" />
                   ) : (
-                      <MapPin className="w-2.5 h-2.5 md:w-3 md:h-3 text-indigo-400 flex-shrink-0" />
+                    <MapPin className="w-2.5 h-2.5 text-primary-400 flex-shrink-0" />
                   )}
                   <span className="truncate">{ev.title}</span>
-              </div>
+                </div>
               ))}
               {dayEvents.length > 3 && (
-              <div className="text-[8px] md:text-[9px] text-slate-500 pl-1">+{dayEvents.length - 3} more</div>
+                <div className="text-[8px] md:text-[9px] text-gray-400 dark:text-slate-500 pl-1">+{dayEvents.length - 3} more</div>
               )}
             </div>
           </>
         )}
 
-        {/* Hover Plus Icon - only on non-touch devices */}
+        {/* Hover plus icon */}
         {!isClosed && dayEvents.length === 0 && (
-          <div className="absolute inset-0 hidden sm:flex items-center justify-center opacity-0 group-hover:opacity-100 bg-slate-900/60 backdrop-blur-[1px] rounded-lg transition-opacity pointer-events-none">
-              <Plus className="w-5 h-5 md:w-6 md:h-6 text-indigo-400 drop-shadow-sm" />
+          <div className="absolute inset-0 hidden sm:flex items-center justify-center opacity-0 group-hover:opacity-100 bg-white/60 dark:bg-slate-900/40 backdrop-blur-[2px] rounded-xl transition-opacity pointer-events-none">
+            <Plus className="w-5 h-5 text-primary-400 dark:text-primary-500" />
           </div>
         )}
       </div>
     );
   };
 
-  // Render a day column for week view
+  // Week day column
   const renderWeekDay = (date: Date) => {
-    const y = date.getFullYear();
-    const m = date.getMonth();
-    const d = date.getDate();
+    const y = date.getFullYear(), m = date.getMonth(), d = date.getDate();
     const dayEvents = getEventsForDay(y, m, d);
     const isToday = new Date().toDateString() === date.toDateString();
     const { isHoliday, isManualClosed, isClosedDay } = checkStatus(y, m, d);
@@ -185,51 +161,48 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     return (
       <div
         key={date.toISOString()}
-        className={`flex flex-col border rounded-lg transition-all min-h-[200px] sm:min-h-[350px]
+        className={`flex flex-col rounded-xl transition-all min-h-[200px] sm:min-h-[350px] border
           ${isClosed
-            ? 'bg-slate-950/50 border-slate-800 opacity-60'
-            : 'bg-slate-800 border-slate-700'
+            ? 'bg-gray-50/50 dark:bg-slate-900/30 border-gray-100 dark:border-slate-800/50 opacity-60'
+            : 'bg-white dark:bg-slate-800/30 border-gray-100 dark:border-slate-800/60'
           }
-          ${isToday ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-slate-900' : ''}
+          ${isToday ? 'ring-2 ring-primary-500 ring-offset-1 ring-offset-gray-50 dark:ring-offset-slate-900' : ''}
         `}
       >
-        {/* Day header */}
         <div
-          className={`p-2 border-b border-slate-700 cursor-pointer hover:bg-slate-750 transition-colors ${isClosed ? 'cursor-not-allowed' : ''}`}
+          className={`p-2.5 border-b border-gray-100 dark:border-slate-800/60 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors rounded-t-xl ${isClosed ? 'cursor-not-allowed' : ''}`}
           onClick={() => !isClosed && onDayClick(date)}
         >
           <div className="text-center">
-            <div className="text-[10px] sm:text-xs text-slate-500 uppercase font-bold">
+            <div className="text-[10px] sm:text-[11px] text-gray-400 dark:text-slate-500 uppercase font-semibold tracking-wider">
               {date.toLocaleDateString(locale, { weekday: 'short' })}
             </div>
-            <div className={`text-sm sm:text-lg font-bold mt-0.5 ${isToday ? 'text-indigo-400' : 'text-slate-200'}`}>
+            <div className={`text-base sm:text-xl font-bold mt-0.5 ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-800 dark:text-slate-200'}`}>
               {d}
             </div>
-            {isHoliday && <AlertCircle className="w-3 h-3 text-red-500 mx-auto mt-0.5" />}
-            {(isManualClosed || isClosedDay) && !isHoliday && <Lock className="w-3 h-3 text-slate-600 mx-auto mt-0.5" />}
+            {isHoliday && <AlertCircle className="w-3 h-3 text-red-400 mx-auto mt-0.5" />}
+            {(isManualClosed || isClosedDay) && !isHoliday && <Lock className="w-3 h-3 text-gray-400 dark:text-slate-600 mx-auto mt-0.5" />}
           </div>
         </div>
 
-        {/* Events list */}
-        <div className="flex-1 p-1.5 space-y-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 p-2 space-y-1.5 overflow-y-auto">
           {dayEvents.map(ev => (
             <div
               key={ev.id}
               onClick={() => onEventClick(ev)}
-              className="flex items-start gap-1.5 text-[10px] sm:text-xs p-1.5 sm:p-2 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium border-l-2 cursor-pointer transition-colors"
+              className="flex items-start gap-1.5 text-[10px] sm:text-xs p-2 rounded-lg bg-gray-50 dark:bg-slate-700/40 hover:bg-gray-100 dark:hover:bg-slate-700/60 text-gray-600 dark:text-slate-300 font-medium border-l-2 cursor-pointer transition-colors"
               style={{ borderLeftColor: getTechColor(ev.technicianId) }}
-              title={`Click to edit: ${ev.title}`}
             >
               <div className="min-w-0 flex-1">
-                <div className="font-semibold truncate text-slate-200">{ev.title}</div>
-                <div className="flex items-center gap-1.5 mt-0.5 text-slate-400 flex-wrap">
+                <div className="font-semibold truncate text-gray-800 dark:text-slate-200 text-[11px] sm:text-[13px]">{ev.title}</div>
+                <div className="flex items-center gap-1.5 mt-0.5 text-gray-400 dark:text-slate-400 flex-wrap">
                   {ev.startTime && (
-                    <span className="text-[10px] font-mono text-indigo-300">{ev.startTime}{ev.endTime ? `–${ev.endTime}` : ''}</span>
+                    <span className="text-[10px] font-mono text-primary-500 dark:text-primary-400">{ev.startTime}{ev.endTime ? `–${ev.endTime}` : ''}</span>
                   )}
                   {ev.locationType === 'REMOTE' ? (
-                    <span className="flex items-center gap-0.5"><Headset className="w-3 h-3 flex-shrink-0" /> Remote</span>
+                    <span className="flex items-center gap-0.5"><Headset className="w-3 h-3" /> Remote</span>
                   ) : (
-                    <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3 flex-shrink-0 text-indigo-400" /> Op locatie</span>
+                    <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3 text-primary-400" /> Op locatie</span>
                   )}
                 </div>
               </div>
@@ -237,7 +210,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           ))}
           {dayEvents.length === 0 && !isClosed && (
             <div
-              className="flex items-center justify-center h-full min-h-[40px] text-slate-600 hover:text-indigo-400 cursor-pointer transition-colors rounded hover:bg-slate-750"
+              className="flex items-center justify-center h-full min-h-[40px] text-gray-300 dark:text-slate-600 hover:text-primary-400 cursor-pointer transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800/50"
               onClick={() => onDayClick(date)}
             >
               <Plus className="w-4 h-4" />
@@ -248,55 +221,52 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     );
   };
 
-  // Month view data
   const daysInMonth = getDaysInMonth(year, month);
   const startDay = getFirstDayOfMonth(year, month);
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const padding = Array.from({ length: startDay }, (_, i) => i);
 
   return (
-    <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-3 sm:p-4 md:p-6 h-full flex flex-col">
+    <div className="surface-raised rounded-2xl p-3 sm:p-4 md:p-5 h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 sm:mb-4">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <h2 className="text-base sm:text-xl font-bold text-slate-100 capitalize">
+        <div className="flex items-center gap-2.5">
+          <h2 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100 capitalize tracking-tight">
             {headerText}
           </h2>
-          <span className="hidden sm:inline text-xs bg-slate-800 text-slate-400 px-2 py-1 rounded border border-slate-700 font-normal">
-              {businessHours.start} - {businessHours.end}
+          <span className="hidden sm:inline text-[11px] bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500 px-2 py-0.5 rounded-lg font-medium">
+            {businessHours.start} - {businessHours.end}
           </span>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* View toggle */}
-          <div className="flex bg-slate-800 rounded-lg border border-slate-700 p-0.5">
+        <div className="flex items-center gap-2">
+          {/* View toggle — pill */}
+          <div className="flex p-0.5 rounded-lg bg-gray-100 dark:bg-slate-800 border border-gray-200/50 dark:border-slate-700/50">
             <button
               onClick={() => onCalendarViewChange('month')}
-              className={`px-2 py-1 rounded text-[10px] sm:text-xs font-medium transition-all flex items-center gap-1 ${
-                calendarView === 'month' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2 py-1 rounded-md text-[10px] sm:text-[11px] font-semibold transition-all duration-200 flex items-center gap-1 ${
+                calendarView === 'month' ? 'bg-white dark:bg-slate-700 text-gray-800 dark:text-white shadow-sm' : 'text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
               }`}
-              title="Month view"
             >
               <Calendar className="w-3 h-3" />
               <span className="hidden sm:inline">Month</span>
             </button>
             <button
               onClick={() => onCalendarViewChange('week')}
-              className={`px-2 py-1 rounded text-[10px] sm:text-xs font-medium transition-all flex items-center gap-1 ${
-                calendarView === 'week' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              className={`px-2 py-1 rounded-md text-[10px] sm:text-[11px] font-semibold transition-all duration-200 flex items-center gap-1 ${
+                calendarView === 'week' ? 'bg-white dark:bg-slate-700 text-gray-800 dark:text-white shadow-sm' : 'text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
               }`}
-              title="Week view"
             >
               <List className="w-3 h-3" />
               <span className="hidden sm:inline">Week</span>
             </button>
           </div>
 
-          {/* Navigation */}
-          <div className="flex gap-1 sm:gap-2">
-            <button onClick={onPrev} className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
+          {/* Nav arrows */}
+          <div className="flex gap-1">
+            <button onClick={onPrev} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300">
               <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
-            <button onClick={onNext} className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
+            <button onClick={onNext} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300">
               <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
@@ -306,9 +276,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       {calendarView === 'month' ? (
         <>
           {/* Weekday headers */}
-          <div className="grid grid-cols-7 gap-0.5 sm:gap-1 mb-1 sm:mb-2">
+          <div className="grid grid-cols-7 gap-0.5 sm:gap-1 mb-1.5">
             {weekDaysFull.map((d, i) => (
-              <div key={d} className="text-center text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider py-1 sm:py-2">
+              <div key={d} className="text-center text-[10px] sm:text-[11px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider py-1.5">
                 <span className="hidden sm:inline">{d}</span>
                 <span className="sm:hidden">{weekDaysMobile[i]}</span>
               </div>
@@ -316,16 +286,15 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           </div>
 
           {/* Month grid */}
-          <div className="grid grid-cols-7 gap-0.5 sm:gap-1 md:gap-2 flex-1">
+          <div className="grid grid-cols-7 gap-0.5 sm:gap-1 md:gap-1.5 flex-1">
             {padding.map((_, i) => (
-              <div key={`pad-${i}`} className="min-h-[36px] sm:min-h-[48px] md:aspect-square bg-slate-950/50 rounded sm:rounded-lg border border-transparent"></div>
+              <div key={`pad-${i}`} className="min-h-[38px] sm:min-h-[52px] md:aspect-square bg-gray-50/50 dark:bg-transparent rounded-xl"></div>
             ))}
             {days.map(day => renderMonthDay(day))}
           </div>
         </>
       ) : (
-        /* Week view */
-        <div className="grid grid-cols-7 gap-1 sm:gap-2 flex-1">
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2 flex-1">
           {weekDays.map(date => renderWeekDay(date))}
         </div>
       )}

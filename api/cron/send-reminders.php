@@ -33,6 +33,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../helpers/UUID.php';
 require_once __DIR__ . '/../helpers/SmtpMailer.php';
 require_once __DIR__ . '/../integrations/Office365.php';
+require_once __DIR__ . '/../controllers/PushController.php';
 
 $db = Database::getInstance();
 
@@ -236,6 +237,23 @@ foreach ($events as $event) {
             } else {
                 $failCount++;
                 logOutput("FAIL: {$customerEmail} — {$error} (event {$event['id']}, {$reminderDay}d before)");
+            }
+
+            // Send push notification alongside email
+            try {
+                $pushResult = PushController::sendReminder(
+                    $db,
+                    $customer['name'] ?? $customer['company'] ?? 'Client',
+                    $service['name'] ?? 'Appointment',
+                    $dateStr,
+                    $event['start_time'] ?? '09:00',
+                    $event['id']
+                );
+                if ($pushResult['sent'] > 0) {
+                    logOutput("PUSH: Sent to {$pushResult['sent']} device(s) for event {$event['id']}");
+                }
+            } catch (\Exception $e) {
+                logOutput("PUSH FAIL: " . $e->getMessage());
             }
         }
     }

@@ -259,6 +259,24 @@ class ApiClient {
   getEmailLogs() {
     return this.request<{ logs: Array<{ id: string; recipient: string; subject: string; status: string; method: string; error: string | null; created_at: string }> }>('GET', '/email-logs');
   }
+
+  // ── Push Notifications ────────────────────────────────────────
+
+  getPushConfig() {
+    return this.request<{ vapidPublicKey: string; enabled: boolean; timings: number[] }>('GET', '/push/config');
+  }
+
+  registerPushSubscription(subscription: any) {
+    return this.request('POST', '/push/subscribe', subscription);
+  }
+
+  unregisterPushSubscription(endpoint: string) {
+    return this.request('POST', '/push/unsubscribe', { endpoint });
+  }
+
+  testPushNotification() {
+    return this.request<{ success: boolean }>('POST', '/push/test');
+  }
 }
 
 export const api = new ApiClient();

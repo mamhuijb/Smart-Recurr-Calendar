@@ -129,6 +129,14 @@ route('POST', '/integrations/office365/calendar-event', fn($b, $p) => Integratio
 route('GET',  '/email-logs',                            fn($b, $p) => IntegrationController::emailLogs());
 route('POST', '/integrations/invoiceninja/sync-customers', fn($b, $p) => IntegrationController::invoiceNinjaSyncCustomers());
 
+// ── Push Notifications ──────────────────────────────────────
+require_once __DIR__ . '/controllers/PushController.php';
+
+route('GET',  '/push/config',      fn($b, $p) => PushController::config());
+route('POST', '/push/subscribe',   fn($b, $p) => PushController::subscribe($b));
+route('POST', '/push/unsubscribe', fn($b, $p) => PushController::unsubscribe($b));
+route('POST', '/push/test',        fn($b, $p) => PushController::test());
+
 // ── Cron (secret-protected) ─────────────────────────────────
 route('GET', '/cron/send-reminders', function () {
     $cronSecret = Env::get('CRON_SECRET', '');
