@@ -2,57 +2,24 @@
 
 Recurring appointment scheduler for MSPs with Office 365, Syncro MSP, Invoice Ninja, and Zoho integrations.
 
-**Stack:** React + TypeScript + Tailwind CSS / PHP 8.1+ / MariaDB / LiteSpeed
+**Stack:** React + Tailwind CSS / PHP 8.1+ / MariaDB / LiteSpeed
 
 ---
 
-## Installation on Plesk (LiteSpeed + PHP + MariaDB)
+## Deploying on Plesk
 
-### Prerequisites
+The frontend is pre-built and committed to git. No Node.js needed on the server.
 
-- Plesk with LiteSpeed or Apache
-- PHP 8.1+ with extensions: `pdo_mysql`, `curl`, `mbstring`, `openssl`, `json`
-- MariaDB 10.5+ (or MySQL 8+)
-- HTTPS enabled (required for push notifications and security headers)
-
-> Node.js is **only needed on your development machine** to build the frontend. The production server runs PHP only.
-
-### Step 1: Build the frontend (on your dev machine)
+### Step 1: Pull the code
 
 ```bash
-npm install
-npm run build
+cd /httpdocs
+git pull origin main
 ```
 
-This creates `app.html` and `assets/` with the compiled React app.
+Everything needed is in the repo: `app.html`, `assets/`, `api/`, `.htaccess`, etc.
 
-### Step 2: Upload to Plesk
-
-Upload to your domain's document root (e.g. `/httpdocs/`):
-
-```
-/httpdocs/
-├── .htaccess              ← Routing + security (already configured)
-├── .env                   ← Create this (see Step 4)
-├── app.html               ← Built frontend entry point
-├── assets/                ← Built JS/CSS (hashed filenames)
-├── sw.js                  ← Service worker for push notifications
-├── manifest.json          ← PWA manifest
-├── api/                   ← PHP backend
-│   ├── index.php          ← API router
-│   ├── config/
-│   ├── controllers/
-│   ├── helpers/
-│   ├── integrations/
-│   ├── middleware/
-│   └── cron/
-└── database/
-    └── schema.sql         ← Database schema
-```
-
-**Do NOT upload:** `node_modules/`, `*.ts`, `*.tsx`, `package.json`, `tsconfig.json`, `.git/`
-
-### Step 3: Create the database
+### Step 2: Create the database (first time only)
 
 In Plesk > Databases:
 1. Create database `smartrecur`
@@ -63,9 +30,7 @@ In Plesk > Databases:
 mysql -u smartrecur -p smartrecur < database/schema.sql
 ```
 
-This creates all tables and a default admin user.
-
-### Step 4: Create .env file
+### Step 3: Create `.env` file (first time only)
 
 Create `.env` in your document root (next to `.htaccess`):
 
@@ -87,93 +52,62 @@ TIMEZONE=Europe/Amsterdam
 CRON_SECRET=paste_a_32_char_random_string_here
 ```
 
-Generate secrets:
+Generate secrets: `openssl rand -hex 32`
+
+Set permissions: `chmod 600 .env`
+
+### Step 4: Verify PHP extensions
+
+In Plesk > PHP Settings, enable: `pdo_mysql`, `curl`, `mbstring`, `openssl`, `json`
+
+### Step 5: Test
+
+Visit `https://your-domain.com` and login with **admin** / **change_me_on_first_login**
+
+If something is wrong, set `APP_DEBUG=true` in `.env` and check `/api/health`.
+
+---
+
+## Updating
+
+After code changes are merged:
+
 ```bash
-openssl rand -hex 32
+cd /httpdocs
+git pull origin main
 ```
 
-Set file permissions:
-```bash
-chmod 600 .env
-```
+That's it. The built frontend is included in the repo. No build step needed.
 
-### Step 5: Verify PHP extensions
+If the update includes database changes, check the release notes for migration SQL.
 
-In Plesk > PHP Settings, enable:
-- `pdo_mysql`
-- `curl`
-- `mbstring`
-- `openssl`
-- `json`
+---
 
-### Step 6: Test
-
-1. Visit `https://your-domain.com/api/health` — should show `{"status":"ok","database":"connected"}`
-2. Visit `https://your-domain.com` — login screen appears
-3. Login: **admin** / **change_me_on_first_login**
-
-### Step 7: Change the default password
+## Changing the default password
 
 ```bash
 php -r "echo password_hash('YourNewPassword', PASSWORD_BCRYPT, ['cost' => 12]);"
 ```
 
-Then in MariaDB:
 ```sql
 UPDATE users SET password_hash = '<output>' WHERE username = 'admin';
 ```
 
-### Step 8: Set up email reminders (optional)
-
-In Plesk > Scheduled Tasks, add a cron job:
-```
-0 8 * * * curl -s "https://your-domain.com/api/cron/send-reminders?token=YOUR_CRON_SECRET"
-```
-
-This sends reminder emails daily at 8:00 AM.
-
 ---
 
-## Troubleshooting
+## Email reminders (cron)
 
-### "Server returned non-JSON response (500)"
+In Plesk > Scheduled Tasks:
 
-1. Set `APP_DEBUG=true` in `.env` temporarily to see the actual error
-2. Visit `/api/health` to check database connectivity
-3. Common fixes:
-   - `.env` missing → create it from the template above
-   - Wrong DB credentials → check DB_USER/DB_PASS
-   - Tables missing → run `schema.sql`
-   - PHP extension missing → enable `pdo_mysql` in Plesk PHP Settings
-4. Set `APP_DEBUG=false` after fixing
-
-### Updating an existing database
-
-If you already have the database and pulled new code with schema changes:
-
-```sql
--- Add reminder_log table
-CREATE TABLE IF NOT EXISTS reminder_log (
-    id VARCHAR(36) PRIMARY KEY,
-    event_id VARCHAR(36) NOT NULL,
-    target_date DATE NOT NULL,
-    reminder_day INT NOT NULL,
-    recipient VARCHAR(255) NOT NULL,
-    status ENUM('sent', 'failed') NOT NULL DEFAULT 'sent',
-    method VARCHAR(20) DEFAULT NULL,
-    error TEXT DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_event_date_day (event_id, target_date, reminder_day),
-    INDEX idx_event_id (event_id),
-    INDEX idx_created (created_at)
-) ENGINE=InnoDB;
+```
+0 8 * * * curl -s "https://your-domain.com/api/cron/send-reminders?token=YOUR_CRON_SECRET"
 ```
 
 ---
 
 ## Integrations
 
-All integrations are configured in **Admin > Settings** within the app.
+Configured in **Admin > Settings** within the app.
 
 | Integration | Auth | Features |
 |-------------|------|----------|
@@ -183,41 +117,23 @@ All integrations are configured in **Admin > Settings** within the app.
 | Zoho | API Key | CRM integration |
 | SMTP | Credentials | Direct email sending |
 
-### Office 365 Setup
-
-1. Register app at [Azure Portal](https://portal.azure.com) > App Registrations
-2. Add redirect URI: `https://your-domain.com/api/integrations/office365/callback`
-3. Add permissions: `User.Read`, `Calendars.ReadWrite`, `Mail.Send`
-4. Enter Client ID + Tenant ID in Admin panel
-5. Click "Connect" to start OAuth flow
-
 ---
 
-## Architecture
+## Development (modifying source code)
 
-```
-Browser → app.html (React SPA)
-              ↓ fetch /api/*
-         .htaccess rewrites to api/index.php
-              ↓ JWT auth
-         PHP Controllers
-              ↓ PDO prepared statements
-         MariaDB
-              ↓
-         External APIs (Office 365, Syncro, Invoice Ninja, Zoho)
+Only needed if you want to change the React frontend.
+
+```bash
+npm install
+npm run dev          # Vite dev server on :5173
+php -S localhost:8000 -t . api/index.php   # PHP backend
 ```
 
-- JWT authentication with bcrypt passwords and optional TOTP 2FA
-- All API keys stored server-side (never sent to browser)
-- Rate limiting on login (5 attempts / 5 minutes)
-- Global error handler ensures JSON responses (never raw PHP errors)
-- PUT/DELETE sent as POST with X-HTTP-Method-Override for WAF compatibility
-- Web Push notifications via VAPID (auto-generated keys)
+After making changes:
 
----
-
-## Default Login
-
-| Username | Password |
-|----------|----------|
-| `admin` | `change_me_on_first_login` |
+```bash
+npm run build        # Rebuilds app.html + assets/
+git add app.html assets/
+git commit -m "rebuild frontend"
+git push
+```
