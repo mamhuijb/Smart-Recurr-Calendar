@@ -112,24 +112,33 @@ function route(string $routeMethod, string $pattern, callable $handler): void {
 
 // ── Health ──────────────────────────────────────────────────
 route('GET', '/health', function () {
-    $checks = ['status' => 'ok', 'version' => '2.0.1', 'php' => PHP_VERSION];
+    $isDebug = getenv('APP_DEBUG') === 'true';
+    $checks = ['status' => 'ok', 'version' => '2.0.1'];
 
-    // Check .env loaded
-    $checks['env'] = Env::get('DB_HOST') ? 'loaded' : 'missing';
+    if ($isDebug) {
+        $checks['php'] = PHP_VERSION;
+        $checks['env'] = Env::get('DB_HOST') ? 'loaded' : 'missing';
 
-    // Check database
-    try {
-        $db = Database::getInstance();
-        $db->query('SELECT 1');
-        $checks['database'] = 'connected';
-
-        // Check if tables exist
-        $tables = $db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
-        $checks['tables'] = $tables;
-    } catch (\Exception $e) {
-        $checks['database'] = 'error';
-        $checks['db_error'] = $e->getMessage();
-        $checks['status'] = 'degraded';
+        try {
+            $db = Database::getInstance();
+            $db->query('SELECT 1');
+            $checks['database'] = 'connected';
+            $checks['tables'] = $db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+        } catch (\Exception $e) {
+            $checks['database'] = 'error';
+            $checks['db_error'] = $e->getMessage();
+            $checks['status'] = 'degraded';
+        }
+    } else {
+        // Production: only show basic status, no internals
+        try {
+            $db = Database::getInstance();
+            $db->query('SELECT 1');
+            $checks['database'] = 'connected';
+        } catch (\Exception $e) {
+            $checks['database'] = 'error';
+            $checks['status'] = 'degraded';
+        }
     }
 
     Response::json($checks);
