@@ -3,16 +3,18 @@ export type LocationType = 'REMOTE' | 'ON_SITE';
 
 export interface RecurrenceEvent {
   id: string;
-  title: string; 
-  customerId: string; 
+  title: string;
+  customerId: string;
   serviceId: string;
-  technicianId?: string; 
-  assetId?: string; 
-  syncroTicketId?: string; 
-  locationType: LocationType; 
+  technicianId?: string;
+  assetId?: string;
+  syncroTicketId?: string;
+  locationType: LocationType;
   description: string;
-  recurrenceRule: string; 
-  generatedDates: string[]; 
+  recurrenceRule: string;
+  generatedDates: string[];
+  startTime?: string; // "09:00" — 24h format, defaults to business hours start
+  endTime?: string;   // "10:00" — auto-calculated from startTime + service duration
   status: 'SCHEDULED' | 'COMPLETED' | 'MISSED';
   createdAt: number;
 }
@@ -33,7 +35,8 @@ export interface Customer {
   company: string;
   address?: string; 
   postcode?: string;
-  syncroId?: string; 
+  syncroId?: string;
+  invoiceninjaId?: string;
   assets?: Asset[];
 }
 
@@ -51,7 +54,18 @@ export interface Service {
   defaultLocation: LocationType;
   color: string;
   createTicket: boolean;
-  emailTemplate?: EmailTemplate; // New: Service specific template
+  emailTemplate?: EmailTemplate;
+  reminderDays?: number[]; // Per-service override; falls back to global if empty/undefined
+}
+
+export interface EmailLogEntry {
+  id: string;
+  recipient: string;
+  subject: string;
+  status: 'sent' | 'failed';
+  method: 'smtp' | 'office365';
+  error?: string;
+  createdAt: string;
 }
 
 export interface EmailTemplate {
@@ -92,30 +106,45 @@ export interface SecuritySettings {
     twoFactorSecret: string; // In production, this would be encrypted
 }
 
+export interface SmtpConfig {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    fromEmail: string;
+    fromName: string;
+    encryption: 'tls' | 'ssl' | 'none';
+}
+
 export interface AppSettings {
   branding: BrandingSettings;
-  security: SecuritySettings; // New
+  security: SecuritySettings;
   office365: {
     clientId: string;
     tenantId: string;
+    clientSecret?: string;
+    redirectUri?: string;
     auth: OAuthState;
-    selectedCalendarId?: string; 
+    selectedCalendarId?: string;
+    calendarSyncEnabled?: boolean;
   };
+  smtp: SmtpConfig;
+  preferredMailMethod: 'auto' | 'smtp' | 'office365';
   integrations: {
     syncroApiKey: string;
     syncroSubdomain: string;
-    invoiceNinja: IntegrationConfig; // New
-    zoho: IntegrationConfig; // New
+    invoiceNinja: IntegrationConfig;
+    zoho: IntegrationConfig;
   };
   reminders: {
-    days: number[]; 
+    days: number[];
   };
   templates: {
-    reminder: EmailTemplate; // Global default
+    reminder: EmailTemplate;
   };
-  businessHours: BusinessHours; 
-  manualClosures: string[]; 
-  holidays: string[]; 
+  businessHours: BusinessHours;
+  manualClosures: string[];
+  holidays: string[];
 }
 
 export interface Reminder {
@@ -143,11 +172,22 @@ export const DEFAULT_SETTINGS: AppSettings = {
       twoFactorEnabled: false,
       twoFactorSecret: 'JBSWY3DPEHPK3PXP' // Mock Base32 secret
   },
-  office365: { 
-    clientId: '', 
-    tenantId: '', 
-    auth: { isConnected: false } 
+  office365: {
+    clientId: '',
+    tenantId: '',
+    auth: { isConnected: false },
+    calendarSyncEnabled: false,
   },
+  smtp: {
+    host: '',
+    port: 587,
+    username: '',
+    password: '',
+    fromEmail: '',
+    fromName: 'SmartRecur',
+    encryption: 'tls',
+  },
+  preferredMailMethod: 'auto',
   integrations: { 
       syncroApiKey: '', 
       syncroSubdomain: '',
