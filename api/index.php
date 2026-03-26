@@ -4,6 +4,46 @@
  * PHP backend for Plesk + MariaDB deployment.
  */
 
+// ── Global error handler: ensure ALL errors output JSON, never HTML ──
+error_reporting(E_ALL);
+ini_set('display_errors', '0'); // Don't leak HTML errors to client
+ini_set('log_errors', '1');
+
+set_error_handler(function (int $severity, string $message, string $file, int $line) {
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+set_exception_handler(function (Throwable $e) {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    $response = ['error' => 'Internal server error'];
+    // In development, include details; in production, log only
+    if (getenv('APP_DEBUG') === 'true') {
+        $response['debug'] = $e->getMessage();
+        $response['file'] = $e->getFile() . ':' . $e->getLine();
+    }
+    error_log('SmartRecur API error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    echo json_encode($response);
+    exit;
+});
+
+register_shutdown_function(function () {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        if (!headers_sent()) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+        }
+        $response = ['error' => 'Fatal server error'];
+        if (getenv('APP_DEBUG') === 'true') {
+            $response['debug'] = $error['message'];
+            $response['file'] = $error['file'] . ':' . $error['line'];
+        }
+        error_log('SmartRecur FATAL: ' . $error['message'] . ' in ' . $error['file'] . ':' . $error['line']);
+        echo json_encode($response);
+    }
+});
+
 // Bootstrap – load env early so CORS_ORIGIN is available
 require_once __DIR__ . '/helpers/Env.php';
 Env::load(dirname(__DIR__) . '/.env');
@@ -72,7 +112,27 @@ function route(string $routeMethod, string $pattern, callable $handler): void {
 
 // ── Health ──────────────────────────────────────────────────
 route('GET', '/health', function () {
-    Response::json(['status' => 'ok', 'version' => '2.0.0']);
+    $checks = ['status' => 'ok', 'version' => '2.0.1', 'php' => PHP_VERSION];
+
+    // Check .env loaded
+    $checks['env'] = Env::get('DB_HOST') ? 'loaded' : 'missing';
+
+    // Check database
+    try {
+        $db = Database::getInstance();
+        $db->query('SELECT 1');
+        $checks['database'] = 'connected';
+
+        // Check if tables exist
+        $tables = $db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+        $checks['tables'] = $tables;
+    } catch (\Exception $e) {
+        $checks['database'] = 'error';
+        $checks['db_error'] = $e->getMessage();
+        $checks['status'] = 'degraded';
+    }
+
+    Response::json($checks);
 });
 
 // ── Auth ────────────────────────────────────────────────────
