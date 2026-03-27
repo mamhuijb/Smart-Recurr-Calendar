@@ -702,85 +702,77 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
     }, [localSettings.office365.auth.isConnected, integrationStatus.office365?.isConnected]);
 
+    const navBtn = (tab: Tab, icon: React.ReactNode, label: string, onClick?: () => void, badge?: React.ReactNode) => (
+        <button
+            onClick={onClick || (() => setActiveTab(tab))}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-200 group ${
+                activeTab === tab
+                    ? 'bg-primary-600 text-white shadow-sm shadow-primary-600/20'
+                    : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100/80 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-slate-200'
+            }`}
+        >
+            <span className={`flex-shrink-0 ${activeTab === tab ? 'text-white/90' : 'text-gray-400 dark:text-slate-500 group-hover:text-gray-600 dark:group-hover:text-slate-300'}`}>{icon}</span>
+            <span className="truncate">{label}</span>
+            {badge && <span className="ml-auto flex-shrink-0">{badge}</span>}
+        </button>
+    );
+
+    const sectionLabel = (text: string) => (
+        <div className="px-3 pb-1 pt-5 text-[10px] font-bold text-gray-400/80 dark:text-slate-600 uppercase tracking-[0.08em] first:pt-0">{text}</div>
+    );
+
     return (
-        <div className="flex h-full bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-gray-200 dark:border-slate-800 text-gray-800 dark:text-slate-300">
+        <div className="flex h-full bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-elevated border border-gray-200/60 dark:border-slate-800/60 text-gray-800 dark:text-slate-300">
             {/* Sidebar */}
-            <div className="w-64 bg-gray-50 dark:bg-slate-950 text-gray-500 dark:text-slate-400 flex flex-col border-r border-gray-200 dark:border-slate-800 overflow-y-auto">
-                <div className="p-6 border-b border-gray-200 dark:border-slate-800">
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                        <Key className="w-5 h-5 text-primary-600 dark:text-primary-500" />
-                        Admin Panel
+            <div className="w-60 bg-gray-50/80 dark:bg-slate-950/80 flex flex-col border-r border-gray-200/60 dark:border-slate-800/60 overflow-y-auto">
+                <div className="px-5 py-5 border-b border-gray-200/60 dark:border-slate-800/60">
+                    <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm shadow-primary-600/20">
+                            <Key className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        Admin
                     </h2>
                 </div>
-                <nav className="flex-1 p-4 space-y-2 text-sm">
-                    <div className="px-2 pb-1 text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-wider">General</div>
-                    <button onClick={() => setActiveTab('REPORTS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'REPORTS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <BarChart3 className="w-4 h-4" /> Reporting
-                    </button>
-                    <button onClick={() => setActiveTab('BRANDING')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'BRANDING' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Palette className="w-4 h-4" /> Branding & UI
-                    </button>
-                    <button onClick={() => setActiveTab('SECURITY')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'SECURITY' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <ShieldCheck className="w-4 h-4" /> Security (2FA)
-                    </button>
+                <nav className="flex-1 px-3 py-3 space-y-0.5 text-sm">
+                    {sectionLabel('General')}
+                    {navBtn('REPORTS', <BarChart3 className="w-4 h-4" />, 'Reporting')}
+                    {navBtn('BRANDING', <Palette className="w-4 h-4" />, 'Branding & UI')}
+                    {navBtn('SECURITY', <ShieldCheck className="w-4 h-4" />, 'Security (2FA)')}
 
-                    <div className="px-2 pb-1 pt-4 text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-wider">Operations</div>
-                    <button onClick={() => setActiveTab('CUSTOMERS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'CUSTOMERS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Users className="w-4 h-4" /> Customers
-                    </button>
-                    <button onClick={() => setActiveTab('SERVICES')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'SERVICES' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Briefcase className="w-4 h-4" /> Services
-                    </button>
-                    <button onClick={() => setActiveTab('TECHS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'TECHS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <UserCog className="w-4 h-4" /> Technicians
-                    </button>
-                    <button onClick={() => setActiveTab('BUSINESS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'BUSINESS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Clock className="w-4 h-4" /> Business Hours
-                    </button>
+                    {sectionLabel('Operations')}
+                    {navBtn('CUSTOMERS', <Users className="w-4 h-4" />, 'Customers')}
+                    {navBtn('SERVICES', <Briefcase className="w-4 h-4" />, 'Services')}
+                    {navBtn('TECHS', <UserCog className="w-4 h-4" />, 'Technicians')}
+                    {navBtn('BUSINESS', <Clock className="w-4 h-4" />, 'Business Hours')}
 
-                    <div className="px-2 pb-1 pt-4 text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-wider">Integrations</div>
-                    <button onClick={() => setActiveTab('OAUTH')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'OAUTH' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <ShieldCheck className="w-4 h-4" /> Office 365
-                        {integrationStatus.office365?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
-                    </button>
-                    <button onClick={() => setActiveTab('SMTP')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'SMTP' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Bell className="w-4 h-4" /> SMTP Email
-                        {integrationStatus.smtp?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
-                    </button>
-                    <button onClick={() => setActiveTab('INTEGRATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'INTEGRATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <RefreshCw className="w-4 h-4" /> Syncro MSP
-                        {integrationStatus.syncro?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
-                    </button>
-                    <button onClick={() => setActiveTab('INVOICENINJA')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'INVOICENINJA' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Activity className="w-4 h-4" /> InvoiceNinja
-                        {integrationStatus.invoiceninja?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
-                    </button>
-                    <button onClick={() => setActiveTab('ZOHO')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'ZOHO' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Activity className="w-4 h-4" /> Zoho
-                        {integrationStatus.zoho?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
-                    </button>
+                    {sectionLabel('Integrations')}
+                    {navBtn('OAUTH', <ShieldCheck className="w-4 h-4" />, 'Office 365', undefined,
+                        integrationStatus.office365?.isConnected ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : undefined)}
+                    {navBtn('SMTP', <Mail className="w-4 h-4" />, 'SMTP Email', undefined,
+                        integrationStatus.smtp?.isConnected ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : undefined)}
+                    {navBtn('INTEGRATIONS', <RefreshCw className="w-4 h-4" />, 'Syncro MSP', undefined,
+                        integrationStatus.syncro?.isConnected ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : undefined)}
+                    {navBtn('INVOICENINJA', <Activity className="w-4 h-4" />, 'InvoiceNinja', undefined,
+                        integrationStatus.invoiceninja?.isConnected ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : undefined)}
+                    {navBtn('ZOHO', <Activity className="w-4 h-4" />, 'Zoho', undefined,
+                        integrationStatus.zoho?.isConnected ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : undefined)}
 
-                    <div className="px-2 pb-1 pt-4 text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-wider">System</div>
-                    <button onClick={() => setActiveTab('NOTIFICATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'NOTIFICATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Bell className="w-4 h-4" /> Email & Reminders
-                    </button>
-                    <button onClick={() => setActiveTab('PUSH_NOTIFICATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'PUSH_NOTIFICATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <BellRing className="w-4 h-4" /> Push Notifications
-                    </button>
-                    <button onClick={() => { setActiveTab('EMAIL_LOGS'); if (emailLogs.length === 0) { setLoadingLogs(true); api.getEmailLogs().then(r => setEmailLogs(r.logs || [])).catch(() => {}).finally(() => setLoadingLogs(false)); } }} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'EMAIL_LOGS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <FileText className="w-4 h-4" /> Email Logs
-                    </button>
-                    <button onClick={() => setActiveTab('BACKUP')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'BACKUP' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Database className="w-4 h-4" /> Backup & Restore
-                    </button>
+                    {sectionLabel('System')}
+                    {navBtn('NOTIFICATIONS', <Bell className="w-4 h-4" />, 'Email & Reminders')}
+                    {navBtn('PUSH_NOTIFICATIONS', <BellRing className="w-4 h-4" />, 'Push Notifications')}
+                    {navBtn('EMAIL_LOGS', <FileText className="w-4 h-4" />, 'Email Logs',
+                        () => { setActiveTab('EMAIL_LOGS'); if (emailLogs.length === 0) { setLoadingLogs(true); api.getEmailLogs().then(r => setEmailLogs(r.logs || [])).catch(() => {}).finally(() => setLoadingLogs(false)); } })}
+                    {navBtn('BACKUP', <Database className="w-4 h-4" />, 'Backup & Restore')}
                 </nav>
-                <div className="p-4 border-t border-gray-200 dark:border-slate-800">
-                    <button onClick={onClose} className="w-full py-2 text-sm text-center text-gray-500 hover:text-gray-900 dark:text-slate-500 dark:hover:text-white">Exit Admin</button>
+                <div className="px-3 py-3 border-t border-gray-200/60 dark:border-slate-800/60">
+                    <button onClick={onClose} className="w-full py-2 text-[13px] text-center text-gray-500 hover:text-gray-900 dark:text-slate-500 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-all duration-200">
+                        Sluiten
+                    </button>
                 </div>
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900 p-8">
+            <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900 p-6 sm:p-8">
 
                 {/* REPORTING DASHBOARD */}
                 {activeTab === 'REPORTS' && (
