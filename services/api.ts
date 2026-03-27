@@ -50,7 +50,9 @@ class ApiClient {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
 
-    if (res.status === 401) {
+    // Only treat 401 as "session expired" for authenticated requests (not login/2FA)
+    const isAuthEndpoint = path === '/auth/login' || path === '/auth/verify-2fa';
+    if (res.status === 401 && !isAuthEndpoint) {
       this.clearToken();
       window.location.reload();
       throw new Error('Session expired');
