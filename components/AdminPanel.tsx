@@ -1,12 +1,13 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppSettings, Customer, Service, Technician, RecurrenceEvent } from '../types';
-import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone, Loader2, Mail, Send, FileText, Plus, BellRing } from 'lucide-react';
+import { Save, Users, Bell, RefreshCw, Briefcase, Key, ShieldCheck, UserCog, BarChart3, MapPin, Headset, PieChart, Clock, Calendar, Lock, Trash2, Palette, Moon, Sun, Database, Download, Upload, CheckCircle2, XCircle, Activity, Smartphone, Loader2, Mail, Send, FileText, Plus, BellRing, Timer } from 'lucide-react';
 import { api } from '../services/api';
 import { notificationManager } from '../utils/notificationManager';
 import { toast } from '../utils/toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateSecret, generateTotpUri } from '../utils/authSecurity';
+import { CronJobsTab } from './CronJobsTab';
 
 interface IntegrationStatus {
     isConnected: boolean;
@@ -27,7 +28,7 @@ interface AdminPanelProps {
     onClose: () => void;
 }
 
-type Tab = 'REPORTS' | 'BRANDING' | 'OAUTH' | 'SMTP' | 'INTEGRATIONS' | 'INVOICENINJA' | 'ZOHO' | 'SERVICES' | 'TECHS' | 'CUSTOMERS' | 'BUSINESS' | 'NOTIFICATIONS' | 'PUSH_NOTIFICATIONS' | 'EMAIL_LOGS' | 'BACKUP' | 'SECURITY';
+type Tab = 'REPORTS' | 'BRANDING' | 'OAUTH' | 'SMTP' | 'INTEGRATIONS' | 'INVOICENINJA' | 'ZOHO' | 'SERVICES' | 'TECHS' | 'CUSTOMERS' | 'BUSINESS' | 'NOTIFICATIONS' | 'PUSH_NOTIFICATIONS' | 'EMAIL_LOGS' | 'BACKUP' | 'SECURITY' | 'CRON';
 
 // Extracted as a proper component to avoid hooks-in-IIFE violation
 const PushNotificationsTab: React.FC = () => {
@@ -762,6 +763,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     {navBtn('PUSH_NOTIFICATIONS', <BellRing className="w-4 h-4" />, 'Push Notifications')}
                     {navBtn('EMAIL_LOGS', <FileText className="w-4 h-4" />, 'Email Logs',
                         () => { setActiveTab('EMAIL_LOGS'); if (emailLogs.length === 0) { setLoadingLogs(true); api.getEmailLogs().then(r => setEmailLogs(r.logs || [])).catch(() => {}).finally(() => setLoadingLogs(false)); } })}
+                    {navBtn('CRON', <Timer className="w-4 h-4" />, 'Scheduled Tasks')}
                     {navBtn('BACKUP', <Database className="w-4 h-4" />, 'Backup & Restore')}
                 </nav>
                 <div className="px-3 py-3 border-t border-gray-200/60 dark:border-slate-800/60">
@@ -1741,6 +1743,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 {/* PUSH NOTIFICATIONS Tab */}
                 {activeTab === 'PUSH_NOTIFICATIONS' && <PushNotificationsTab />}
+
+                {/* CRON JOBS Tab */}
+                {activeTab === 'CRON' && <CronJobsTab />}
 
                 {/* EMAIL LOGS Tab */}
                 {activeTab === 'EMAIL_LOGS' && (

@@ -279,6 +279,30 @@ class ApiClient {
   testPushNotification() {
     return this.request<{ success: boolean }>('POST', '/push/test');
   }
+
+  // ── Cron Management ──────────────────────────────────────────
+
+  getCronStatus() {
+    return this.request<{
+      settings: { enabled: boolean; frequencyMinutes: number; runHour: number; runMinute: number };
+      health: string;
+      lastRun: { id: number; startedAt: string; finishedAt: string | null; durationMs: number; status: string; emailsSent: number; emailsFailed: number; pushSent: number; error: string | null; triggeredBy: string } | null;
+      nextRun: string | null;
+      recentLogs: Array<{ id: number; startedAt: string; finishedAt: string | null; durationMs: number; status: string; emailsSent: number; emailsFailed: number; pushSent: number; error: string | null; triggeredBy: string }>;
+    }>('GET', '/cron/status');
+  }
+
+  updateCronSettings(settings: { enabled: boolean; frequencyMinutes: number; runHour: number; runMinute: number }) {
+    return this.request('PUT', '/cron/settings', settings);
+  }
+
+  triggerCronRun() {
+    return this.request<{ success: boolean; duration_ms: number; emails_sent: number; emails_failed: number; error: string | null }>('POST', '/cron/run');
+  }
+
+  clearCronLogs() {
+    return this.request('DELETE', '/cron/logs');
+  }
 }
 
 export const api = new ApiClient();

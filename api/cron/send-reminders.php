@@ -34,8 +34,15 @@ require_once __DIR__ . '/../helpers/UUID.php';
 require_once __DIR__ . '/../helpers/SmtpMailer.php';
 require_once __DIR__ . '/../integrations/Office365.php';
 require_once __DIR__ . '/../controllers/PushController.php';
+require_once __DIR__ . '/../controllers/CronController.php';
 
 $db = Database::getInstance();
+
+// Start cron log entry
+$_cronStartTime = microtime(true);
+$_cronTriggeredBy = (php_sapi_name() === 'cli') ? 'cron' : (isset($_cronTriggeredByOverride) ? $_cronTriggeredByOverride : 'cron');
+$_cronLogId = CronController::startLog($db, 'send-reminders', $_cronTriggeredBy);
+$_cronPushCount = 0;
 
 // Ensure reminder_log table exists (tracks sent reminders to avoid duplicates)
 $db->exec('CREATE TABLE IF NOT EXISTS reminder_log (
@@ -251,6 +258,7 @@ foreach ($events as $event) {
                     $event['id']
                 );
                 if ($pushResult['sent'] > 0) {
+                    $_cronPushCount += $pushResult['sent'];
                     logOutput("PUSH: Sent to {$pushResult['sent']} device(s) for event {$event['id']}");
                 }
             } catch (\Exception $e) {
@@ -261,6 +269,10 @@ foreach ($events as $event) {
 }
 
 logOutput("Done. Sent: {$sentCount}, Failed: {$failCount}");
+
+// Finish cron log entry
+$_cronDurationMs = (int) ((microtime(true) - $_cronStartTime) * 1000);
+CronController::finishLog($db, $_cronLogId, 'success', $sentCount, $failCount, $_cronPushCount, $_cronDurationMs);
 
 // Output to console (CLI) or JSON (HTTP)
 function logOutput(string $msg): void {

@@ -208,7 +208,15 @@ route('POST', '/push/subscribe',   fn($b, $p) => PushController::subscribe($b));
 route('POST', '/push/unsubscribe', fn($b, $p) => PushController::unsubscribe($b));
 route('POST', '/push/test',        fn($b, $p) => PushController::test());
 
-// ── Cron (secret-protected) ─────────────────────────────────
+// ── Cron Management (authenticated) ────────────────────────
+require_once __DIR__ . '/controllers/CronController.php';
+
+route('GET',    '/cron/status',   fn($b, $p) => CronController::status());
+route('PUT',    '/cron/settings', fn($b, $p) => CronController::updateSettings($b));
+route('POST',   '/cron/run',      fn($b, $p) => CronController::manualRun());
+route('DELETE', '/cron/logs',     fn($b, $p) => CronController::clearLogs());
+
+// ── Cron Execution (secret-protected) ──────────────────────
 route('GET', '/cron/send-reminders', function () {
     $cronSecret = Env::get('CRON_SECRET', '');
     $token = $_GET['token'] ?? '';

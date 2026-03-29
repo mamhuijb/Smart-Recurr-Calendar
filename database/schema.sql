@@ -169,6 +169,26 @@ CREATE TABLE IF NOT EXISTS reminder_log (
 ) ENGINE=InnoDB;
 
 -- ============================================================
+-- CRON LOGS (tracks cron job executions)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS cron_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    job_name VARCHAR(100) NOT NULL,
+    started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP NULL,
+    duration_ms INT DEFAULT NULL,
+    status ENUM('running', 'success', 'error') NOT NULL DEFAULT 'running',
+    emails_sent INT DEFAULT 0,
+    emails_failed INT DEFAULT 0,
+    push_sent INT DEFAULT 0,
+    error_message TEXT DEFAULT NULL,
+    triggered_by ENUM('cron', 'manual', 'unknown') NOT NULL DEFAULT 'unknown',
+    INDEX idx_job (job_name),
+    INDEX idx_started (started_at),
+    INDEX idx_status (status)
+) ENGINE=InnoDB;
+
+-- ============================================================
 -- INTEGRATION CONFIGS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS integration_configs (
