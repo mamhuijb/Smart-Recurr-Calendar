@@ -57,9 +57,8 @@ if ($allowedOrigin === '*') {
 } elseif ($requestOrigin && $requestOrigin === $allowedOrigin) {
     header('Access-Control-Allow-Origin: ' . $allowedOrigin);
     header('Access-Control-Allow-Credentials: true');
-} else {
-    header('Access-Control-Allow-Origin: ' . $allowedOrigin);
 }
+// If origin doesn't match, no Access-Control-Allow-Origin header is sent (browser blocks request)
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-HTTP-Method-Override');
 header('X-Content-Type-Options: nosniff');

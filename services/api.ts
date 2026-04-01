@@ -66,7 +66,8 @@ class ApiClient {
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.error || `Request failed (${res.status})`);
+      const errorMsg = typeof data.error === 'string' ? data.error : `Request failed (${res.status})`;
+      throw new Error(errorMsg);
     }
 
     return data;

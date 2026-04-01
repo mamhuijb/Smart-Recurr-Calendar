@@ -75,14 +75,19 @@ class SettingsController {
         try {
             $db->beginTransaction();
 
-            // Restore settings
-            if (isset($body['data']['settings'])) {
+            // Restore settings (validate JSON before inserting)
+            if (isset($body['data']['settings']) && is_array($body['data']['settings'])) {
                 foreach ($body['data']['settings'] as $row) {
                     $key = $row['setting_key'] ?? null;
                     $val = $row['setting_value'] ?? null;
-                    if (!$key || !$val) continue;
+                    if (!$key || !is_string($key) || strlen($key) > 100) continue;
+                    if ($val === null) continue;
+                    $jsonVal = is_string($val) ? $val : json_encode($val);
+                    // Validate it's valid JSON
+                    json_decode($jsonVal);
+                    if (json_last_error() !== JSON_ERROR_NONE) continue;
                     $db->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)')
-                       ->execute([$key, is_string($val) ? $val : json_encode($val)]);
+                       ->execute([$key, $jsonVal]);
                 }
             }
 

@@ -57,6 +57,13 @@ class AuthController {
             Response::error('Token and code are required', 400);
         }
 
+        // Rate limiting: prevent 2FA brute-force
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $rateKey = "2fa:{$ip}";
+        if (!RateLimiter::check($rateKey)) {
+            Response::error('Too many 2FA attempts. Please wait 5 minutes.', 429);
+        }
+
         $config  = require __DIR__ . '/../config/app.php';
         $payload = JWT::decode($tempToken, $config['jwt_secret']);
 
@@ -74,6 +81,7 @@ class AuthController {
         }
 
         if (!self::verifyTOTP($code, $user['two_factor_secret'])) {
+            RateLimiter::hit($rateKey);
             Response::error('Invalid 2FA code', 401);
         }
 

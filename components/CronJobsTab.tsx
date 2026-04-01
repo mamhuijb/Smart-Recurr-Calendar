@@ -36,8 +36,10 @@ export const CronJobsTab: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadStatus = async () => {
+    setLoadError(null);
     try {
       const data = await api.getCronStatus();
       setSettings(data.settings);
@@ -46,6 +48,7 @@ export const CronJobsTab: React.FC = () => {
       setNextRun(data.nextRun);
       setLogs(data.recentLogs);
     } catch (e: any) {
+      setLoadError(e.message);
       toast.error(`Failed to load cron status: ${e.message}`);
     } finally {
       setLoading(false);
@@ -153,6 +156,22 @@ export const CronJobsTab: React.FC = () => {
     return (
       <div className="flex items-center justify-center py-20 text-gray-400 dark:text-slate-500">
         <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading cron status...
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-4 max-w-3xl animate-fade-in">
+        <h3 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+          <Timer className="w-6 h-6 text-primary-500" /> Scheduled Tasks
+        </h3>
+        <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">
+          Failed to load cron status: {loadError}
+        </div>
+        <button onClick={loadStatus} className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1.5">
+          <RefreshCw className="w-3.5 h-3.5" /> Retry
+        </button>
       </div>
     );
   }

@@ -74,8 +74,15 @@ export const EventCreator: React.FC<EventCreatorProps> = ({
 
   useEffect(() => {
     if (initialRule) {
-      const d = new Date(initialRule);
-      if (!isNaN(d.getTime())) { setSingleDate(d.toISOString().split('T')[0]); setScheduleType('ONE_TIME'); }
+      // Accept ISO date (YYYY-MM-DD) or parseable date string
+      const isoMatch = initialRule.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (isoMatch) {
+        setSingleDate(isoMatch[1]);
+        setScheduleType('ONE_TIME');
+      } else {
+        const d = new Date(initialRule);
+        if (!isNaN(d.getTime())) { setSingleDate(d.toISOString().split('T')[0]); setScheduleType('ONE_TIME'); }
+      }
     } else { handleBuilderCalculate(); }
   }, [initialRule]);
 

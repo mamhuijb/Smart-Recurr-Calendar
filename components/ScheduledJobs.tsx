@@ -33,8 +33,9 @@ export const ScheduledJobs: React.FC<ScheduledJobsProps> = ({
       const service = services.find(s => s.id === event.serviceId);
       const technician = technicians.find(t => t.id === event.technicianId);
 
+      if (!event.generatedDates || !Array.isArray(event.generatedDates)) return;
       event.generatedDates.forEach(dateStr => {
-        const eventDate = new Date(dateStr); eventDate.setHours(0, 0, 0, 0);
+        const eventDate = new Date(dateStr + 'T00:00:00'); eventDate.setHours(0, 0, 0, 0);
         const diffDays = Math.round((eventDate.getTime() - todayTime) / (1000 * 60 * 60 * 24));
         if (diffDays >= 0 && diffDays <= 90) {
           jobs.push({ event, date: dateStr, customer, service, technician, daysFromNow: diffDays });

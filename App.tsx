@@ -145,7 +145,8 @@ const App: React.FC = () => {
   };
 
   const handleDayClick = (date: Date) => {
-    setInitialRule(date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
+    const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
+    setInitialRule(`${y}-${m}-${d}`);
     setViewMode(ViewMode.CREATE);
   };
 

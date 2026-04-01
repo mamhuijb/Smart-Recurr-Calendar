@@ -24,8 +24,9 @@ export const ReminderDashboard: React.FC<ReminderDashboardProps> = ({
       if (!customer || !service) return;
 
       const reminderDays = (service.reminderDays && service.reminderDays.length > 0)
-        ? service.reminderDays : settings.reminders.days;
+        ? service.reminderDays : (settings.reminders?.days || [14, 7, 1]);
 
+      if (!event.generatedDates || !Array.isArray(event.generatedDates)) return;
       event.generatedDates.forEach(dateStr => {
         const diffDays = Math.ceil((new Date(dateStr).getTime() - todayTime) / (1000 * 60 * 60 * 24));
         if (reminderDays.includes(diffDays) || diffDays === 0) {

@@ -53,10 +53,14 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
   const endTime = calcEndTime(startTime, durationMin);
   const timeSlots = useMemo(() => generateTimeSlots(businessHours.start, businessHours.end), [businessHours.start, businessHours.end]);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!title.trim()) return;
     setSaving(true);
-    onSave({ ...event, title: title.trim(), customerId, serviceId, technicianId: technicianId || undefined, locationType, description, generatedDates: dates.sort(), startTime, endTime });
+    try {
+      onSave({ ...event, title: title.trim(), customerId, serviceId, technicianId: technicianId || undefined, locationType, description, generatedDates: dates.sort(), startTime, endTime });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleRemoveDate = (dateStr: string) => setDates(dates.filter(d => d !== dateStr));

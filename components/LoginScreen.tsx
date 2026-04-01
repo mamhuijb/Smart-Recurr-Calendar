@@ -112,6 +112,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, branding }) =
                     maxLength={6}
                     inputMode="numeric"
                     autoComplete="one-time-code"
+                    aria-label="Six-digit authentication code"
                     className="w-full px-4 py-3 bg-white/60 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl text-gray-900 dark:text-white text-center text-xl tracking-[0.3em] font-mono focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500 outline-none transition-all"
                     placeholder="000000"
                     value={twoFactorCode}
