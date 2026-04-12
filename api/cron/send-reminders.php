@@ -32,6 +32,7 @@ if (php_sapi_name() !== 'cli') {
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../helpers/UUID.php';
 require_once __DIR__ . '/../helpers/SmtpMailer.php';
+require_once __DIR__ . '/../helpers/IcsGenerator.php';
 require_once __DIR__ . '/../integrations/Office365.php';
 require_once __DIR__ . '/../controllers/PushController.php';
 require_once __DIR__ . '/../controllers/CronController.php';
@@ -206,20 +207,42 @@ foreach ($events as $event) {
                 $body = str_replace($key, $val, $body);
             }
 
-            // Send email
+            // Generate .ics calendar file for this occurrence so customer
+            // can add it to their own calendar with one click.
+            $icsContent = IcsGenerator::build([
+                'uid'         => IcsGenerator::buildUid($event['id'], $dateStr),
+                'summary'     => $service['name'] ?? $event['title'] ?? 'Appointment',
+                'description' => trim(($event['description'] ?? '') . "\n\nTechnician: {$techName}"),
+                'date'        => $dateStr,
+                'startTime'   => $event['start_time'] ?? '09:00',
+                'endTime'     => $event['end_time'] ?? '10:00',
+                'location'    => $event['location_type'] === 'ON_SITE' ? ('Op locatie — ' . ($customer['address'] ?? '')) : 'Remote',
+                'timezone'    => $timezone,
+                'organizerName'  => $smtpConfig['fromName'] ?? ($customer['company'] ?? 'SmartRecur'),
+                'organizerEmail' => $smtpConfig['fromEmail'] ?? $smtpConfig['username'] ?? 'noreply@smartrecur.local',
+                'attendeeName'   => $customer['name'] ?? '',
+                'attendeeEmail'  => $customerEmail,
+            ]);
+            $icsAttachment = [[
+                'filename'    => 'appointment.ics',
+                'contentType' => 'text/calendar; method=REQUEST; charset=UTF-8',
+                'content'     => $icsContent,
+            ]];
+
+            // Send email with .ics attachment
             $method = '';
             $success = false;
             $error = '';
 
             foreach ($tryOrder as $try) {
                 if ($try === 'smtp' && $smtpReady) {
-                    $result = SmtpMailer::send($smtpConfig, $customerEmail, $subject, $body);
+                    $result = SmtpMailer::send($smtpConfig, $customerEmail, $subject, $body, $icsAttachment);
                     $method = 'smtp';
                     $success = $result['success'];
                     $error = $result['error'] ?? '';
                     break;
                 } elseif ($try === 'office365' && $o365Ready) {
-                    $result = Office365Integration::sendMail($o365Config, $customerEmail, $subject, $body);
+                    $result = Office365Integration::sendMail($o365Config, $customerEmail, $subject, $body, $icsAttachment);
                     $method = 'office365';
                     $success = $result['success'];
                     $error = $result['error'] ?? '';

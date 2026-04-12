@@ -175,23 +175,41 @@ class Office365Integration {
     }
 
     /**
-     * Send an email via Microsoft Graph API.
+     * Send an email via Microsoft Graph API, optionally with attachments.
+     *
+     * @param array $attachments Each: ['filename' => ..., 'contentType' => ..., 'content' => <raw bytes>]
      */
-    public static function sendMail(array $config, string $to, string $subject, string $body): array {
+    public static function sendMail(array $config, string $to, string $subject, string $body, array $attachments = []): array {
         $token = $config['accessToken'] ?? '';
         if (!$token) return ['success' => false, 'error' => 'Not connected to Office 365'];
 
-        $mailData = [
-            'message' => [
-                'subject' => $subject,
-                'body'    => [
-                    'contentType' => 'Text',
-                    'content'     => $body,
-                ],
-                'toRecipients' => [
-                    ['emailAddress' => ['address' => $to]],
-                ],
+        $message = [
+            'subject' => $subject,
+            'body'    => [
+                'contentType' => 'Text',
+                'content'     => $body,
             ],
+            'toRecipients' => [
+                ['emailAddress' => ['address' => $to]],
+            ],
+        ];
+
+        // Attach files via Graph API (base64-encoded)
+        if (!empty($attachments)) {
+            $graphAttachments = [];
+            foreach ($attachments as $att) {
+                $graphAttachments[] = [
+                    '@odata.type' => '#microsoft.graph.fileAttachment',
+                    'name'        => $att['filename'] ?? 'attachment.bin',
+                    'contentType' => $att['contentType'] ?? 'application/octet-stream',
+                    'contentBytes'=> base64_encode($att['content'] ?? ''),
+                ];
+            }
+            $message['attachments'] = $graphAttachments;
+        }
+
+        $mailData = [
+            'message' => $message,
             'saveToSentItems' => true,
         ];
 

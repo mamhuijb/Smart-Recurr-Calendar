@@ -78,13 +78,54 @@ If something is wrong, set `APP_DEBUG=true` in `.env` and check `/api/health`.
 
 ### Step 6: Set up the cron job
 
-In Plesk > Scheduled Tasks, add a cron task with desired frequency (e.g. every hour):
+The reminder cron job sends emails with an attached `.ics` calendar file so customers can add the appointment to their own calendar (Apple, Outlook, Google, etc.) with one click.
+
+**Automatic registration is not possible** — Plesk's scheduled tasks can only be created by the server admin (root), not by a PHP process running as the web user. You must add the cron task once through the Plesk GUI.
+
+#### Option A — Plesk GUI (recommended)
+
+1. Log in to Plesk
+2. Go to **Domains** → your domain → **Scheduled Tasks**
+3. Click **Add Task**
+4. Fill in the form:
+   - **Task type:** Fetch a URL
+   - **URL:** `https://your-domain.com/api/cron/send-reminders?token=YOUR_CRON_SECRET` (replace both placeholders)
+   - **Run:** "Cron style" → enter `0 * * * *` for hourly, or use the picker
+   - **Notify:** uncheck "Send notification" (prevents mail spam on every run)
+5. Click **OK** to save
+6. Click **Run Now** once to verify it works — you should see a green checkmark
+
+> Replace `YOUR_CRON_SECRET` with the exact value from your `.env` file. The URL must use HTTPS.
+
+#### Option B — SSH / crontab (advanced)
+
+If you have SSH access, you can add the task directly to the system crontab:
+
+```bash
+crontab -e
+```
+
+Add this line:
 
 ```
-0 * * * * curl -s "https://your-domain.com/api/cron/send-reminders?token=YOUR_CRON_SECRET"
+0 * * * * curl -s "https://your-domain.com/api/cron/send-reminders?token=YOUR_CRON_SECRET" > /dev/null 2>&1
 ```
 
-You can also manage frequency and monitor execution from **Admin > Scheduled Tasks** in the app.
+#### Monitoring
+
+Once the cron is registered, you can monitor it from **Admin → Scheduled Tasks** inside the app:
+- Green checkmark when the last run succeeded
+- Full execution history with timing, email counts, and errors
+- Manual "Run Now" button for testing
+- Frequency settings (the cron itself must be registered in Plesk, but the in-app settings control which events get reminders at which intervals)
+
+#### Recommended frequency
+
+| Frequency | Use case |
+|-----------|----------|
+| Every 15 min | Precise timing, faster push notifications |
+| Hourly (recommended) | Good balance between precision and server load |
+| Daily at 08:00 | Low-volume setups, one batch per morning |
 
 ### Step 7: Change the default password
 
@@ -127,7 +168,7 @@ Access via the gear icon in the top-right corner. Sections:
 | **Syncro MSP** | API key connect, customer import, ticket creation |
 | **InvoiceNinja** | API key connect, customer sync |
 | **Zoho** | CRM integration |
-| **Email & Reminders** | Configure reminder days, email templates, test email |
+| **Email & Reminders** | Configure reminder days, email templates, test email. Reminder emails include a `.ics` attachment so recipients can add the appointment to their own calendar. |
 | **Push Notifications** | Web push setup, device registration, timing config |
 | **Email Logs** | View sent/failed email history |
 | **Scheduled Tasks** | Cron job status, manual trigger, execution history |

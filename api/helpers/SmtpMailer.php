@@ -5,7 +5,21 @@
  */
 class SmtpMailer {
 
-    public static function send(array $config, string $to, string $subject, string $body): array {
+    /**
+     * Send an email via SMTP.
+     *
+     * @param array $config     SMTP configuration (host, port, username, password, ...)
+     * @param string $to        Recipient email address
+     * @param string $subject   Email subject
+     * @param string $body      Plain-text body
+     * @param array  $attachments Optional list of attachments. Each entry must be:
+     *   [
+     *     'filename'    => 'appointment.ics',
+     *     'contentType' => 'text/calendar; method=REQUEST; charset=UTF-8',
+     *     'content'     => '...raw file bytes...',
+     *   ]
+     */
+    public static function send(array $config, string $to, string $subject, string $body, array $attachments = []): array {
         $host     = $config['host'] ?? '';
         $port     = (int) ($config['port'] ?? 587);
         $username = $config['username'] ?? '';
@@ -128,17 +142,46 @@ class SmtpMailer {
             $encodedSubject = "=?UTF-8?B?" . base64_encode($subject) . "?=";
             $messageId = '<' . bin2hex(random_bytes(16)) . '@' . gethostname() . '>';
 
-            $message = "From: {$encodedFrom}\r\n";
-            $message .= "To: {$to}\r\n";
-            $message .= "Subject: {$encodedSubject}\r\n";
-            $message .= "Message-ID: {$messageId}\r\n";
-            $message .= "Date: " . date('r') . "\r\n";
-            $message .= "MIME-Version: 1.0\r\n";
-            $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
-            $message .= "Content-Transfer-Encoding: 8bit\r\n";
-            $message .= "\r\n";
+            $headers  = "From: {$encodedFrom}\r\n";
+            $headers .= "To: {$to}\r\n";
+            $headers .= "Subject: {$encodedSubject}\r\n";
+            $headers .= "Message-ID: {$messageId}\r\n";
+            $headers .= "Date: " . date('r') . "\r\n";
+            $headers .= "MIME-Version: 1.0\r\n";
+
+            if (empty($attachments)) {
+                // Simple plain-text message
+                $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+                $headers .= "Content-Transfer-Encoding: 8bit\r\n";
+                $messageBody = $body;
+            } else {
+                // Multipart: text body + attachments
+                $boundary = 'SmartRecur-' . bin2hex(random_bytes(12));
+                $headers .= "Content-Type: multipart/mixed; boundary=\"{$boundary}\"\r\n";
+
+                $messageBody  = "This is a multi-part message in MIME format.\r\n\r\n";
+                $messageBody .= "--{$boundary}\r\n";
+                $messageBody .= "Content-Type: text/plain; charset=UTF-8\r\n";
+                $messageBody .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
+                $messageBody .= $body . "\r\n\r\n";
+
+                foreach ($attachments as $att) {
+                    $fname = $att['filename'] ?? 'attachment.bin';
+                    $ctype = $att['contentType'] ?? 'application/octet-stream';
+                    $content = $att['content'] ?? '';
+                    $encoded = chunk_split(base64_encode($content), 76, "\r\n");
+                    $messageBody .= "--{$boundary}\r\n";
+                    $messageBody .= "Content-Type: {$ctype}; name=\"{$fname}\"\r\n";
+                    $messageBody .= "Content-Transfer-Encoding: base64\r\n";
+                    $messageBody .= "Content-Disposition: attachment; filename=\"{$fname}\"\r\n\r\n";
+                    $messageBody .= $encoded . "\r\n";
+                }
+                $messageBody .= "--{$boundary}--\r\n";
+            }
+
+            $message  = $headers . "\r\n";
             // Escape lines starting with a dot (SMTP transparency)
-            $message .= str_replace("\r\n.", "\r\n..", $body);
+            $message .= str_replace("\r\n.", "\r\n..", $messageBody);
             $message .= "\r\n.\r\n";
 
             fwrite($socket, $message);

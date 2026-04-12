@@ -147,7 +147,8 @@ No PHP frameworks or Composer packages are used. The entire backend is written w
 │   │   ├── UUID.php          # UUID v4 generation
 │   │   ├── Response.php      # JSON response wrapper with exit
 │   │   ├── RateLimiter.php   # IP-based rate limiting (file-based)
-│   │   ├── SmtpMailer.php    # Raw SMTP client (no dependencies)
+│   │   ├── SmtpMailer.php    # Raw SMTP client with MIME attachment support
+│   │   ├── IcsGenerator.php  # RFC 5545 iCalendar (.ics) file builder
 │   │   └── WebPush.php       # Web Push with VAPID (ECDH + HKDF)
 │   ├── integrations/
 │   │   ├── Office365.php     # Microsoft Graph API (OAuth2, calendar, mail)
@@ -356,15 +357,23 @@ The cron job (`api/cron/send-reminders.php`) runs on a schedule and:
 1. Loads all `SCHEDULED` events with their customers, services, and technicians
 2. For each event, checks every generated date against configured reminder days (default: 14, 7, 1 days before)
 3. Checks the `reminder_log` table to prevent duplicate sends
-4. Sends via SMTP or Office 365 Mail.Send (configurable priority)
-5. Logs results to `email_logs` and `reminder_log`
-6. Sends Web Push notifications alongside emails
-7. Records execution metrics in `cron_logs`
+4. Builds an RFC 5545 `.ics` calendar file for each occurrence (stable UID per event+date, so updates replace previous versions in the recipient's calendar)
+5. Sends via SMTP or Office 365 Mail.Send (configurable priority) with the `.ics` attached as `text/calendar; method=REQUEST`
+6. Logs results to `email_logs` and `reminder_log`
+7. Sends Web Push notifications alongside emails
+8. Records execution metrics in `cron_logs`
 
 **Email templates** support placeholders:
 `{customer_name}`, `{service_name}`, `{date}`, `{company_name}`, `{tech_name}`, `{location_type}`, `{link}`
 
 Per-service templates override the global template.
+
+**ICS attachment** (`api/helpers/IcsGenerator.php`):
+- Follows RFC 5545 with proper line folding (max 75 octets) and CRLF endings
+- Includes `VALARM` with 30-minute pre-event alert
+- Stable UID format: `{event_id}-{date}@smartrecur.local` — resending with the same UID updates the existing calendar entry instead of creating a duplicate
+- Times are written in UTC (Z suffix) for maximum client compatibility
+- Compatible with Apple Calendar, Outlook, Google Calendar, Thunderbird, and all other standards-compliant clients
 
 ---
 
