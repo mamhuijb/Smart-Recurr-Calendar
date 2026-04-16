@@ -17,8 +17,8 @@ self.addEventListener('push', (event) => {
   let data = {
     title: 'SmartRecur',
     body: 'You have an upcoming appointment.',
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     tag: 'smartrecur-reminder',
     data: {}
   };
@@ -34,8 +34,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: data.icon || '/favicon.ico',
-    badge: data.badge || '/favicon.ico',
+    icon: data.icon || '/icon-192.png',
+    badge: data.badge || '/icon-192.png',
     tag: data.tag || 'smartrecur-reminder',
     renotify: true,
     requireInteraction: data.requireInteraction || false,

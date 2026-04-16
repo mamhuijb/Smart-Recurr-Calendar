@@ -97,7 +97,7 @@ class PushController {
         $payload = json_encode([
             'title' => 'SmartRecur Test',
             'body'  => 'Push notifications are working! You will receive reminders for upcoming appointments.',
-            'icon'  => '/favicon.ico',
+            'icon'  => '/icon-192.png',
             'tag'   => 'test-' . time(),
             'data'  => ['url' => '/'],
         ]);
@@ -164,7 +164,7 @@ class PushController {
         $payload = json_encode([
             'title' => "Upcoming: $serviceName",
             'body'  => "Appointment with $customerName on $dateStr at $startTime",
-            'icon'  => '/favicon.ico',
+            'icon'  => '/icon-192.png',
             'tag'   => "reminder-$eventId-$dateStr",
             'data'  => ['url' => '/', 'eventId' => $eventId],
             'requireInteraction' => true,

@@ -139,9 +139,10 @@ class IntegrationController {
             $config['redirectUri'] = $origin . '/api/integrations/office365/callback';
         }
 
-        // Generate and persist a CSRF state token
+        // Generate and persist a CSRF state token with 10-minute expiry
         $state = bin2hex(random_bytes(16));
         $config['_oauth_state'] = $state;
+        $config['_oauth_state_expires'] = time() + 600;
         $db->prepare('UPDATE integration_configs SET config = ? WHERE id = ?')
            ->execute([json_encode($config), 'office365']);
 
@@ -165,13 +166,24 @@ class IntegrationController {
 
         // Validate OAuth state parameter to prevent CSRF
         $expectedState = $config['_oauth_state'] ?? '';
+        $stateExpiry   = (int) ($config['_oauth_state_expires'] ?? 0);
         if (!$expectedState || !hash_equals($expectedState, $state)) {
             self::oauthResponse(false, 'Invalid state parameter');
             return;
         }
+        if ($stateExpiry && time() > $stateExpiry) {
+            // Clear expired state before rejecting
+            unset($config['_oauth_state'], $config['_oauth_state_expires']);
+            $db->prepare('UPDATE integration_configs SET config = ? WHERE id = ?')
+               ->execute([json_encode($config), 'office365']);
+            self::oauthResponse(false, 'OAuth session expired, please try again');
+            return;
+        }
 
-        // Clear used state
-        unset($config['_oauth_state']);
+        // Clear used state immediately so it can't be replayed
+        unset($config['_oauth_state'], $config['_oauth_state_expires']);
+        $db->prepare('UPDATE integration_configs SET config = ? WHERE id = ?')
+           ->execute([json_encode($config), 'office365']);
 
         $result = Office365Integration::exchangeCode($code, $config);
 

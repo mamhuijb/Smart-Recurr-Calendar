@@ -44,11 +44,27 @@ class ApiClient {
       headers['X-HTTP-Method-Override'] = method;
     }
 
-    const res = await fetch(`${API_BASE}${path}`, {
-      method: actualMethod,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    // Abort the request after 30 seconds so UI never hangs indefinitely
+    // (happens when a WAF silently drops the request instead of responding).
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}${path}`, {
+        method: actualMethod,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        throw new Error('Request timed out. The server did not respond within 30 seconds — this can happen if a firewall (Imunify360, ModSecurity) is blocking the request. Check your server WAF logs.');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     // Only treat 401 as "session expired" for authenticated requests (not login/2FA)
     const isAuthEndpoint = path === '/auth/login' || path === '/auth/verify-2fa';
@@ -290,19 +306,19 @@ class ApiClient {
       lastRun: { id: number; startedAt: string; finishedAt: string | null; durationMs: number; status: string; emailsSent: number; emailsFailed: number; pushSent: number; error: string | null; triggeredBy: string } | null;
       nextRun: string | null;
       recentLogs: Array<{ id: number; startedAt: string; finishedAt: string | null; durationMs: number; status: string; emailsSent: number; emailsFailed: number; pushSent: number; error: string | null; triggeredBy: string }>;
-    }>('GET', '/cron/status');
+    }>('GET', '/scheduler/status');
   }
 
   updateCronSettings(settings: { enabled: boolean; frequencyMinutes: number; runHour: number; runMinute: number }) {
-    return this.request('PUT', '/cron/settings', settings);
+    return this.request('PUT', '/scheduler/settings', settings);
   }
 
   triggerCronRun() {
-    return this.request<{ success: boolean; duration_ms: number; emails_sent: number; emails_failed: number; error: string | null }>('POST', '/cron/run');
+    return this.request<{ success: boolean; duration_ms: number; emails_sent: number; emails_failed: number; error: string | null }>('POST', '/scheduler/run');
   }
 
   clearCronLogs() {
-    return this.request('DELETE', '/cron/logs');
+    return this.request('DELETE', '/scheduler/logs');
   }
 }
 

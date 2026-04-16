@@ -113,12 +113,12 @@ class NotificationManager {
       if (this.registration) {
         this.registration.showNotification(title, {
           body,
-          icon: '/favicon.ico',
+          icon: '/icon-192.png',
           tag: `local-${Date.now()}`,
           data: data || {},
         });
       } else {
-        new Notification(title, { body, icon: '/favicon.ico' });
+        new Notification(title, { body, icon: '/icon-192.png' });
       }
     }, Math.max(0, delayMs));
   }

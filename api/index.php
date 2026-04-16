@@ -91,8 +91,24 @@ if ($method === 'POST' && !empty($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'])) {
     }
 }
 
-// Request body
-$body = json_decode(file_get_contents('php://input'), true) ?? [];
+// Request body — limit to 2 MB to prevent JSON bombing / memory DoS.
+// Backup restore is the largest realistic payload; 2 MB fits thousands of rows.
+$MAX_BODY_BYTES = 2 * 1024 * 1024;
+$rawBody = file_get_contents('php://input', false, null, 0, $MAX_BODY_BYTES + 1);
+if ($rawBody !== false && strlen($rawBody) > $MAX_BODY_BYTES) {
+    Response::error('Request body too large (max 2 MB)', 413);
+}
+
+$body = [];
+if ($rawBody) {
+    // Limit nesting depth to prevent stack overflow via nested JSON
+    $decoded = json_decode($rawBody, true, 32);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        $body = $decoded;
+    } elseif (json_last_error() !== JSON_ERROR_NONE && $rawBody !== '') {
+        Response::error('Invalid JSON: ' . json_last_error_msg(), 400);
+    }
+}
 
 // Simple router
 $matched = false;
@@ -207,15 +223,28 @@ route('POST', '/push/subscribe',   fn($b, $p) => PushController::subscribe($b));
 route('POST', '/push/unsubscribe', fn($b, $p) => PushController::unsubscribe($b));
 route('POST', '/push/test',        fn($b, $p) => PushController::test());
 
-// ── Cron Management (authenticated) ────────────────────────
+// ── Scheduler Management (authenticated) ──────────────────
+// Note: renamed from /cron/* because some WAF rules (Imunify360, etc.)
+// aggressively block URL patterns containing "cron" due to frequent
+// exploitation of cron endpoints (wp-cron.php takeovers, etc.)
 require_once __DIR__ . '/controllers/CronController.php';
 
+route('GET',    '/scheduler/status',   fn($b, $p) => CronController::status());
+route('PUT',    '/scheduler/settings', fn($b, $p) => CronController::updateSettings($b));
+route('POST',   '/scheduler/run',      fn($b, $p) => CronController::manualRun());
+route('DELETE', '/scheduler/logs',     fn($b, $p) => CronController::clearLogs());
+
+// Backwards-compat aliases under /cron/* — some deployments still reference these.
+// If a WAF blocks them, admins can use /scheduler/* directly.
 route('GET',    '/cron/status',   fn($b, $p) => CronController::status());
 route('PUT',    '/cron/settings', fn($b, $p) => CronController::updateSettings($b));
 route('POST',   '/cron/run',      fn($b, $p) => CronController::manualRun());
 route('DELETE', '/cron/logs',     fn($b, $p) => CronController::clearLogs());
 
 // ── Cron Execution (secret-protected) ──────────────────────
+// Keep this URL because it's already registered in Plesk scheduled tasks.
+// If Imunify360 blocks it, admins should whitelist /api/cron/send-reminders
+// in the Imunify360 dashboard (URL exclusions).
 route('GET', '/cron/send-reminders', function () {
     $cronSecret = Env::get('CRON_SECRET', '');
     $token = $_GET['token'] ?? '';
