@@ -61,21 +61,12 @@ final class SmartRecur_Elementor_Widget extends \Elementor\Widget_Base {
 	}
 
 	/**
-	 * Tell Elementor to enqueue our front-end assets when the widget is on the page.
-	 *
-	 * @return array
-	 */
-	public function get_script_depends() {
-		return array( 'smartrecur-app' );
-	}
-
-	/**
 	 * Tell Elementor to enqueue our stylesheet when the widget is on the page.
 	 *
 	 * @return array
 	 */
 	public function get_style_depends() {
-		return array( 'smartrecur-app' );
+		return array( 'smartrecur-admin' );
 	}
 
 	/**

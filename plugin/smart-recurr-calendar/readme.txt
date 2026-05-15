@@ -4,7 +4,7 @@ Tags: calendar, appointments, scheduling, msp, recurring, office365, syncro
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.4
-Stable tag: 2026.05.4
+Stable tag: 2026.06.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,14 @@ Yes by default. Enable **Settings > Data Management > Delete data on uninstall**
 Use **SmartRecur > Migration Tool** and provide the legacy DB credentials. Customers, services, technicians, and events are copied over.
 
 == Changelog ==
+
+= 2026.06.1 =
+* Full rebuild as a native WordPress plugin. The React single-page app is gone — every screen is now server-rendered PHP using standard WordPress patterns (WP_List_Table, admin forms with nonces, the settings layout).
+* Native admin: Calendar (server-rendered month grid), Appointments / Clients / Services / Technicians (list tables + edit forms), Integrations, Settings, Tools.
+* Server-side recurrence engine replaces the browser-side date generator — YEARLY / HALF_YEARLY / QUARTERLY / MONTHLY with absolute or relative (nth weekday) patterns.
+* [smartrecur] shortcode now renders the calendar as plain server-side HTML — no JavaScript bundle to load on the front end.
+* All REST endpoints, integrations, two-way Office 365 sync, the self-updater, and the dashboard widget are preserved and unchanged.
+* No build step: the plugin is pure PHP plus one small vanilla-JS admin script. node_modules / Vite / TypeScript / Tailwind removed entirely.
 
 = 2026.05.4 =
 * New: Two-way Office 365 calendar sync. Appointments created in SmartRecur push to Outlook in real time; cron pulls Outlook changes every 15 minutes. Conflict resolution is "last write wins".

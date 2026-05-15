@@ -82,20 +82,22 @@ Namespace: `smartrecur/v1`. Every endpoint requires `X-WP-Nonce` and the matchin
 - Invoice Ninja: `POST /integrations/invoiceninja/import`
 - Email: `POST /integrations/email/send`, `GET /email-logs`
 
-## Building from source
+## Architecture
 
-```bash
-cd plugin/smart-recurr-calendar
-npm install
-npm run build      # outputs assets/js/smartrecur-app.js + assets/css/smartrecur-app.css
-```
+As of 2026.06.1 the plugin is **pure PHP** — no build step, no JavaScript framework. Every admin screen is server-rendered using standard WordPress patterns:
 
-The compiled bundle is committed alongside the source so the plugin works without npm on the server.
+- `WP_List_Table` for the Appointments / Clients / Services / Technicians lists.
+- Standard admin forms with `wp_nonce_field()` / `check_admin_referer()`.
+- A server-rendered month-grid calendar (`SmartRecur_Calendar_View`).
+- A server-side recurrence engine (`SmartRecur_Recurrence_Engine`).
+- One small vanilla-JS file (`assets/js/smartrecur-admin.js`) for the recurrence-builder show/hide and the Office 365 connect flow.
+
+The REST API under `smartrecur/v1` is still registered for external consumers (Elementor, integrations, automation) but the plugin's own UI no longer depends on it.
 
 ## Repo layout
 
-- [`plugin/smart-recurr-calendar/`](plugin/smart-recurr-calendar) — the plugin (source + compiled assets).
-- [`release` branch](https://github.com/mamhuijb/Smart-Recurr-Calendar/tree/release) — same contents, flattened to the branch root, used by the auto-updater.
+- [`plugin/smart-recurr-calendar/`](plugin/smart-recurr-calendar) — the plugin.
+- [`release` branch](https://github.com/mamhuijb/Smart-Recurr-Calendar/tree/release) — same contents flattened to the branch root, used by the auto-updater.
 
 ## License
 
