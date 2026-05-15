@@ -43,6 +43,10 @@ final class SmartRecur_Plugin {
 		add_action( 'admin_enqueue_scripts', array( 'SmartRecur_Admin', 'enqueue_admin_assets' ) );
 		add_action( 'admin_notices', array( 'SmartRecur_Admin', 'maybe_welcome_notice' ) );
 
+		// Self-updater (GitHub Releases → WP plugin update flow).
+		SmartRecur_Updater::register();
+		add_filter( 'plugin_action_links_' . SMARTRECUR_PLUGIN_BASENAME, array( __CLASS__, 'plugin_action_links' ) );
+
 		if ( did_action( 'elementor/loaded' ) || defined( 'ELEMENTOR_VERSION' ) ) {
 			add_action( 'elementor/widgets/register', array( $this, 'register_elementor_widget' ) );
 			add_action( 'elementor/elements/categories_registered', array( $this, 'register_elementor_category' ) );
@@ -107,5 +111,28 @@ final class SmartRecur_Plugin {
 				'icon'  => 'eicon-calendar',
 			)
 		);
+	}
+
+	/**
+	 * Add quick action links on the Plugins listing row: Settings + manual
+	 * "Check for updates" that force-refreshes the GitHub release cache.
+	 *
+	 * @param array $links Existing action links.
+	 * @return array
+	 */
+	public static function plugin_action_links( $links ) {
+		$check_url = wp_nonce_url(
+			add_query_arg(
+				array( SmartRecur_Updater::FORCE_REFRESH_GET => '1' ),
+				admin_url( 'plugins.php' )
+			),
+			'smartrecur_force_update_check'
+		);
+
+		$extra = array(
+			'settings'     => '<a href="' . esc_url( admin_url( 'admin.php?page=smartrecur-settings' ) ) . '">' . esc_html__( 'Settings', 'smartrecur' ) . '</a>',
+			'check_update' => '<a href="' . esc_url( $check_url ) . '">' . esc_html__( 'Check for updates', 'smartrecur' ) . '</a>',
+		);
+		return array_merge( $extra, $links );
 	}
 }

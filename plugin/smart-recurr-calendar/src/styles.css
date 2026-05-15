@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Default container backdrop — neutral grey that holds up on both light and
+   dark WordPress admin themes, and on theme front-ends where the shortcode
+   renders. Reset when the React app switches into its own dark mode. */
+.smartrecur-wrap {
+  background-color: rgb(241 245 249); /* slate-100 */
+  color: rgb(15 23 42); /* slate-900 */
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 240px;
+}
+.smartrecur-wrap.dark,
+.dark .smartrecur-wrap {
+  background-color: rgb(15 23 42); /* slate-900 */
+  color: rgb(226 232 240); /* slate-200 */
+}
+
+/* When the wrap is inside the WP admin .wrap, drop the outer margin so the
+   plugin's own card framing handles spacing. */
+.wp-admin .wrap > .smartrecur-wrap {
+  margin-top: 12px;
+}
+
 /* Local component helpers scoped under .smartrecur-wrap (matches tailwind.config.js important selector). */
 .smartrecur-wrap .glass {
   backdrop-filter: blur(12px);
