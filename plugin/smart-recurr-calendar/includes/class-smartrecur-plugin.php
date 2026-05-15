@@ -47,6 +47,9 @@ final class SmartRecur_Plugin {
 		SmartRecur_Updater::register();
 		add_filter( 'plugin_action_links_' . SMARTRECUR_PLUGIN_BASENAME, array( __CLASS__, 'plugin_action_links' ) );
 
+		// WordPress dashboard widget (admin home).
+		SmartRecur_Dashboard_Widget::register();
+
 		if ( did_action( 'elementor/loaded' ) || defined( 'ELEMENTOR_VERSION' ) ) {
 			add_action( 'elementor/widgets/register', array( $this, 'register_elementor_widget' ) );
 			add_action( 'elementor/elements/categories_registered', array( $this, 'register_elementor_category' ) );

@@ -251,6 +251,11 @@ final class SmartRecur_Activator {
 						'body'    => "Hi {customer_name},\n\nWe have scheduled a technician ({tech_name}) for {service_name} on {date}.\nLocation: {location_type}\n\nMet vriendelijke groet,\n{company_name}",
 					),
 				),
+				'dashboardWidget'        => array(
+					'enabled'   => true,
+					'limit'     => 10,
+					'daysAhead' => 30,
+				),
 				'deleteDataOnUninstall'  => false,
 			) );
 		}

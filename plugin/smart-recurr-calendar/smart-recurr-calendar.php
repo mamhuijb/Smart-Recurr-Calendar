@@ -3,7 +3,7 @@
  * Plugin Name:       SmartRecur Calendar
  * Plugin URI:        https://github.com/mamhuijb/Smart-Recurr-Calendar
  * Description:       Recurring appointment scheduler for MSPs. Office 365 + Syncro + Invoice Ninja + Zoho integrations. Embed via shortcode or Elementor widget.
- * Version:           2026.05.2
+ * Version:           2026.05.3
  * Requires at least: 6.0
  * Requires PHP:      8.4
  * Author:            SmartRecur
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SMARTRECUR_VERSION', '2026.05.2' );
+define( 'SMARTRECUR_VERSION', '2026.05.3' );
 define( 'SMARTRECUR_DB_VERSION', '1.0.0' );
 define( 'SMARTRECUR_PLUGIN_FILE', __FILE__ );
 define( 'SMARTRECUR_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
