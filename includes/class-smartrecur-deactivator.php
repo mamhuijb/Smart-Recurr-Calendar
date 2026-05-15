@@ -28,6 +28,11 @@ final class SmartRecur_Deactivator {
 			}
 		}
 
+		// Stop any scheduled cron jobs so an inactive plugin doesn't keep firing them.
+		if ( class_exists( 'SmartRecur_Sync_Office365' ) ) {
+			SmartRecur_Sync_Office365::unschedule();
+		}
+
 		flush_rewrite_rules();
 	}
 }

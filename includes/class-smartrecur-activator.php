@@ -124,8 +124,8 @@ final class SmartRecur_Activator {
 		$sql[] = "CREATE TABLE {$prefix}smartrecur_appointments (
 			id varchar(36) NOT NULL,
 			title varchar(255) NOT NULL,
-			client_id varchar(36) NOT NULL,
-			service_id varchar(36) NOT NULL,
+			client_id varchar(36) NOT NULL DEFAULT '',
+			service_id varchar(36) NOT NULL DEFAULT '',
 			technician_id varchar(36) DEFAULT NULL,
 			asset_id varchar(36) DEFAULT NULL,
 			syncro_ticket_id varchar(50) DEFAULT NULL,
@@ -136,6 +136,7 @@ final class SmartRecur_Activator {
 			start_time varchar(5) DEFAULT NULL,
 			end_time varchar(5) DEFAULT NULL,
 			status varchar(20) NOT NULL DEFAULT 'SCHEDULED',
+			o365_event_id longtext DEFAULT NULL,
 			created_by bigint(20) UNSIGNED DEFAULT NULL,
 			modified_by bigint(20) UNSIGNED DEFAULT NULL,
 			created_at timestamp DEFAULT CURRENT_TIMESTAMP,

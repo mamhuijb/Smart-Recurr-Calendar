@@ -56,6 +56,9 @@ final class SmartRecur_Plugin {
 		// WordPress dashboard widget (admin home).
 		SmartRecur_Dashboard_Widget::register();
 
+		// Two-way Office 365 calendar sync (push on save, cron pull every 15 min).
+		SmartRecur_Sync_Office365::register();
+
 		if ( did_action( 'elementor/loaded' ) || defined( 'ELEMENTOR_VERSION' ) ) {
 			add_action( 'elementor/widgets/register', array( $this, 'register_elementor_widget' ) );
 			add_action( 'elementor/elements/categories_registered', array( $this, 'register_elementor_category' ) );

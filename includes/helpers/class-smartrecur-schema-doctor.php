@@ -48,10 +48,11 @@ final class SmartRecur_Schema_Doctor {
 		self::ensure_columns(
 			$prefix . 'smartrecur_appointments',
 			array(
-				'created_by'   => "ADD COLUMN created_by bigint(20) UNSIGNED DEFAULT NULL",
-				'modified_by'  => "ADD COLUMN modified_by bigint(20) UNSIGNED DEFAULT NULL",
-				'start_time'   => "ADD COLUMN start_time varchar(5) DEFAULT NULL",
-				'end_time'     => "ADD COLUMN end_time varchar(5) DEFAULT NULL",
+				'created_by'    => "ADD COLUMN created_by bigint(20) UNSIGNED DEFAULT NULL",
+				'modified_by'   => "ADD COLUMN modified_by bigint(20) UNSIGNED DEFAULT NULL",
+				'start_time'    => "ADD COLUMN start_time varchar(5) DEFAULT NULL",
+				'end_time'      => "ADD COLUMN end_time varchar(5) DEFAULT NULL",
+				'o365_event_id' => "ADD COLUMN o365_event_id longtext DEFAULT NULL",
 			)
 		);
 

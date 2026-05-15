@@ -92,10 +92,10 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 		);
 		register_rest_route(
 			$this->namespace,
-			'/' . $this->rest_base . '/office365/sync',
+			'/' . $this->rest_base . '/office365/sync-now',
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
-				'callback'            => array( $this, 'office365_sync' ),
+				'callback'            => array( $this, 'office365_sync_now' ),
 				'permission_callback' => $this->require_cap( 'smartrecur_manage' ),
 			)
 		);
@@ -105,6 +105,15 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( $this, 'office365_calendars' ),
+				'permission_callback' => $this->require_cap( 'smartrecur_manage' ),
+			)
+		);
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/office365/select-calendar',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'office365_select_calendar' ),
 				'permission_callback' => $this->require_cap( 'smartrecur_manage' ),
 			)
 		);
@@ -247,9 +256,8 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 
 		switch ( $type ) {
 			case 'office365':
-				$config = $this->office365_config_with_secret();
 				SmartRecur_Office365::ensure_valid_token( $config );
-				$this->office365_persist( $config );
+				SmartRecur_Integration_Config::put( 'office365', $config );
 				list( $ok, $msg ) = SmartRecur_Office365::test( $config );
 				break;
 			case 'syncro':
@@ -282,9 +290,7 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 	 * ------------------------------------------------------------------- */
 
 	/**
-	 * Transient key for per-user OAuth CSRF state. Each admin who starts a flow
-	 * gets their own isolated state, so concurrent flows from different users
-	 * (or from the same user in multiple tabs) don't clobber each other.
+	 * Transient key for per-state OAuth records (CSRF + PKCE verifier).
 	 *
 	 * @param string $state State token.
 	 * @return string
@@ -294,59 +300,53 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * Build the configured OAuth client. Injects clientSecret from wp-config.php
-	 * but never persists it back to the DB.
+	 * POST /integrations/office365/connect — start the PKCE auth-code flow.
 	 *
-	 * @return array
-	 */
-	private function office365_config_with_secret() {
-		$config = SmartRecur_Integration_Config::get( 'office365' );
-		if ( defined( 'SMARTRECUR_O365_CLIENT_SECRET' ) ) {
-			$config['clientSecret'] = SMARTRECUR_O365_CLIENT_SECRET;
-		}
-		return $config;
-	}
-
-	/**
-	 * Save Office 365 config, scrubbing the in-memory secret so it never reaches
-	 * the database. The constant in wp-config.php remains the only source of truth.
-	 *
-	 * @param array $config Config to persist (mutated: clientSecret removed).
-	 */
-	private function office365_persist( array $config ) {
-		unset( $config['clientSecret'] );
-		SmartRecur_Integration_Config::put( 'office365', $config );
-	}
-
-	/**
-	 * POST /integrations/office365/connect — return the OAuth consent URL.
+	 * Generates a per-flow state + PKCE code verifier, stashes them in a
+	 * 10-minute transient bound to the current admin user, and returns the
+	 * Microsoft consent URL.
 	 *
 	 * @return WP_REST_Response
 	 */
 	public function office365_connect() {
-		$config = SmartRecur_Integration_Config::get( 'office365' );
+		if ( ! SmartRecur_Office365::is_configured() ) {
+			return new WP_Error(
+				'smartrecur_o365_not_configured',
+				__( 'Office 365 integration is not configured. The plugin author needs to set the bundled SMARTRECUR_O365_CLIENT_ID, or define SMARTRECUR_O365_CLIENT_ID in wp-config.php with your own Azure AD app client ID. See the README for the one-time Azure setup.', 'smartrecur' ),
+				array( 'status' => 503 )
+			);
+		}
 
+		$config = SmartRecur_Integration_Config::get( 'office365' );
 		$config['redirectUri'] = rest_url( SMARTRECUR_REST_NAMESPACE . '/integrations/office365/callback' );
 
-		$state = bin2hex( random_bytes( 16 ) );
-		// Store a CSRF token tied to the current admin user (and only this user)
-		// in a 10-minute transient. The callback verifies and consumes it.
+		$state    = bin2hex( random_bytes( 16 ) );
+		$verifier = self::pkce_verifier();
+		$challenge = self::pkce_challenge( $verifier );
+
 		set_transient(
 			$this->oauth_state_key( $state ),
 			array(
-				'user_id' => get_current_user_id(),
-				'created' => time(),
+				'user_id'  => get_current_user_id(),
+				'verifier' => $verifier,
+				'created'  => time(),
 			),
 			10 * MINUTE_IN_SECONDS
 		);
 
 		SmartRecur_Integration_Config::put( 'office365', $config );
 
-		return $this->with_no_store( rest_ensure_response( array( 'url' => SmartRecur_Office365::get_auth_url( $config, $state ) ) ) );
+		return $this->with_no_store(
+			rest_ensure_response(
+				array(
+					'url' => SmartRecur_Office365::get_auth_url( $config, $state, $challenge ),
+				)
+			)
+		);
 	}
 
 	/**
-	 * GET /integrations/office365/callback — OAuth redirect handler (renders an HTML page).
+	 * GET /integrations/office365/callback — OAuth redirect handler.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response
@@ -359,21 +359,20 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 			return $this->oauth_html( false, __( 'Missing OAuth code or state.', 'smartrecur' ) );
 		}
 
-		// Validate and atomically consume the state (transient delete prevents replay).
 		$state_key = $this->oauth_state_key( $state );
 		$stored    = get_transient( $state_key );
 		delete_transient( $state_key );
 
-		if ( ! is_array( $stored ) || empty( $stored['user_id'] ) ) {
+		if ( ! is_array( $stored ) || empty( $stored['user_id'] ) || empty( $stored['verifier'] ) ) {
 			return $this->oauth_html( false, __( 'OAuth state expired or unknown. Start the connection again.', 'smartrecur' ) );
 		}
 		if ( get_current_user_id() && (int) $stored['user_id'] !== get_current_user_id() ) {
 			return $this->oauth_html( false, __( 'OAuth state belongs to a different user.', 'smartrecur' ) );
 		}
 
-		$config = $this->office365_config_with_secret();
+		$config = SmartRecur_Integration_Config::get( 'office365' );
 
-		$result = SmartRecur_Office365::exchange_code( $code, $config );
+		$result = SmartRecur_Office365::exchange_code( $code, $stored['verifier'], $config );
 		if ( empty( $result['success'] ) ) {
 			return $this->oauth_html( false, $result['error'] ?? 'Token exchange failed' );
 		}
@@ -382,11 +381,30 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 		$config['refreshToken'] = $result['refreshToken'] ?? '';
 		$config['expiresAt']    = $result['expiresAt'] ?? ( time() + 3600 );
 		$config['userEmail']    = $result['email'] ?? '';
-
-		$this->office365_persist( $config );
+		SmartRecur_Integration_Config::put( 'office365', $config );
 		SmartRecur_Integration_Config::set_status( 'office365', true );
 
 		return $this->oauth_html( true, '', $config['userEmail'] );
+	}
+
+	/**
+	 * Generate a PKCE code verifier (RFC 7636 §4.1).
+	 *
+	 * @return string
+	 */
+	private static function pkce_verifier() {
+		// 64 bytes → 86-char base64url, well within the 43-128 char spec.
+		return rtrim( strtr( base64_encode( random_bytes( 64 ) ), '+/', '-_' ), '=' );
+	}
+
+	/**
+	 * Derive the S256 code challenge from a verifier (RFC 7636 §4.2).
+	 *
+	 * @param string $verifier Code verifier.
+	 * @return string
+	 */
+	private static function pkce_challenge( $verifier ) {
+		return rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' );
 	}
 
 	/**
@@ -436,64 +454,101 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * POST /integrations/office365/disconnect — clear stored tokens.
+	 * POST /integrations/office365/disconnect — clear stored tokens and stop sync.
 	 *
 	 * @return WP_REST_Response
 	 */
 	public function office365_disconnect() {
 		$config = SmartRecur_Integration_Config::get( 'office365' );
-		foreach ( array( 'accessToken', 'refreshToken', 'expiresAt', 'userEmail' ) as $key ) {
+		foreach ( array( 'accessToken', 'refreshToken', 'expiresAt', 'userEmail', 'calendarId', 'lastSyncedAt' ) as $key ) {
 			unset( $config[ $key ] );
 		}
-		$this->office365_persist( $config );
+		SmartRecur_Integration_Config::put( 'office365', $config );
 		SmartRecur_Integration_Config::set_status( 'office365', false );
+		SmartRecur_Sync_Office365::unschedule();
 		return $this->with_no_store( rest_ensure_response( array( 'success' => true ) ) );
 	}
 
 	/**
-	 * POST /integrations/office365/sync — push a SmartRecur appointment to O365 calendar.
+	 * POST /integrations/office365/sync-now — trigger an immediate two-way sync.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function office365_sync_now() {
+		SmartRecur_Sync_Office365::pull_calendar();
+		$config = SmartRecur_Integration_Config::get( 'office365' );
+		return $this->with_no_store(
+			rest_ensure_response(
+				array(
+					'success'       => true,
+					'lastSyncedAt'  => $config['lastSyncedAt'] ?? null,
+				)
+			)
+		);
+	}
+
+	/**
+	 * POST /integrations/office365/select-calendar — set which calendar to sync.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
-	public function office365_sync( $request ) {
-		$config = $this->office365_config_with_secret();
-		SmartRecur_Office365::ensure_valid_token( $config );
-		$this->office365_persist( $config );
-
-		$calendar_id = sanitize_text_field( (string) $request['calendarId'] );
-		$event       = array(
-			'subject' => sanitize_text_field( (string) $request['subject'] ),
-			'body'    => array(
-				'contentType' => 'Text',
-				'content'     => sanitize_textarea_field( (string) $request['description'] ),
-			),
-			'start'   => array(
-				'dateTime' => sanitize_text_field( (string) $request['startDateTime'] ),
-				'timeZone' => sanitize_text_field( (string) ( $request['timeZone'] ?: 'Europe/Amsterdam' ) ),
-			),
-			'end'     => array(
-				'dateTime' => sanitize_text_field( (string) $request['endDateTime'] ),
-				'timeZone' => sanitize_text_field( (string) ( $request['timeZone'] ?: 'Europe/Amsterdam' ) ),
-			),
-		);
-
-		$result = SmartRecur_Office365::create_calendar_event( $config, $event, $calendar_id );
-		if ( empty( $result['success'] ) ) {
-			return new WP_Error( 'smartrecur_o365_sync_failed', $result['error'] ?? 'Sync failed', array( 'status' => 502 ) );
+	public function office365_select_calendar( $request ) {
+		$calendar_id   = sanitize_text_field( (string) $request['calendarId'] );
+		$calendar_name = sanitize_text_field( (string) ( $request['calendarName'] ?? '' ) );
+		if ( '' === $calendar_id ) {
+			return new WP_Error( 'smartrecur_no_calendar', __( 'Pick a calendar.', 'smartrecur' ), array( 'status' => 400 ) );
 		}
-		return $this->with_no_store( rest_ensure_response( $result ) );
+
+		$config = SmartRecur_Integration_Config::get( 'office365' );
+		SmartRecur_Office365::ensure_valid_token( $config );
+		SmartRecur_Integration_Config::put( 'office365', $config );
+
+		// Reject IDs not present in the user's actual calendar list — prevents
+		// a manage-cap user from binding sync to an arbitrary string.
+		$calendars = SmartRecur_Office365::get_calendars( $config );
+		$valid     = false;
+		foreach ( (array) $calendars as $cal ) {
+			if ( isset( $cal['id'] ) && $cal['id'] === $calendar_id ) {
+				$valid = true;
+				if ( '' === $calendar_name && isset( $cal['name'] ) ) {
+					$calendar_name = sanitize_text_field( $cal['name'] );
+				}
+				break;
+			}
+		}
+		if ( ! $valid ) {
+			return new WP_Error( 'smartrecur_invalid_calendar', __( 'That calendar does not belong to the connected Office 365 account.', 'smartrecur' ), array( 'status' => 400 ) );
+		}
+
+		$config['calendarId']   = $calendar_id;
+		$config['calendarName'] = $calendar_name;
+		SmartRecur_Integration_Config::put( 'office365', $config );
+
+		// Re-arm the cron job in case it wasn't scheduled before.
+		SmartRecur_Sync_Office365::unschedule();
+		if ( SmartRecur_Sync_Office365::is_enabled() ) {
+			wp_schedule_event( time() + 60, 'smartrecur_15min', SmartRecur_Sync_Office365::CRON_HOOK );
+		}
+
+		return $this->with_no_store( rest_ensure_response( array( 'success' => true, 'calendarId' => $calendar_id ) ) );
 	}
 
 	/**
-	 * GET /integrations/office365/calendars
+	 * GET /integrations/office365/calendars — list user's calendars.
 	 *
 	 * @return WP_REST_Response
 	 */
 	public function office365_calendars() {
-		$config = $this->office365_config_with_secret();
+		if ( ! SmartRecur_Office365::is_configured() ) {
+			return new WP_Error( 'smartrecur_o365_not_configured', __( 'Office 365 client ID is not configured.', 'smartrecur' ), array( 'status' => 503 ) );
+		}
+		$config = SmartRecur_Integration_Config::get( 'office365' );
+		if ( empty( $config['accessToken'] ) ) {
+			return new WP_Error( 'smartrecur_o365_not_connected', __( 'Connect to Office 365 first.', 'smartrecur' ), array( 'status' => 400 ) );
+		}
 		SmartRecur_Office365::ensure_valid_token( $config );
-		$this->office365_persist( $config );
+		SmartRecur_Integration_Config::put( 'office365', $config );
 
 		return $this->with_no_store( rest_ensure_response( array( 'calendars' => SmartRecur_Office365::get_calendars( $config ) ) ) );
 	}
