@@ -51,11 +51,16 @@ final class SmartRecur_Settings {
 			'themeMode'       => ( isset( $post['theme_mode'] ) && 'light' === $post['theme_mode'] ) ? 'light' : 'dark',
 		);
 
-		// Business hours.
+		// Business hours. Timezone is validated against the real list — a spoofed
+		// POST can't inject a value PHP's date functions would choke on.
+		$tz = isset( $post['business_timezone'] ) ? sanitize_text_field( $post['business_timezone'] ) : 'Europe/Amsterdam';
+		if ( ! in_array( $tz, timezone_identifiers_list(), true ) ) {
+			$tz = 'Europe/Amsterdam';
+		}
 		$settings['businessHours'] = array(
 			'start'      => isset( $post['business_start'] ) ? sanitize_text_field( $post['business_start'] ) : '09:00',
 			'end'        => isset( $post['business_end'] ) ? sanitize_text_field( $post['business_end'] ) : '17:00',
-			'timezone'   => isset( $post['business_timezone'] ) ? sanitize_text_field( $post['business_timezone'] ) : 'Europe/Amsterdam',
+			'timezone'   => $tz,
 			'closedDays' => isset( $post['closed_days'] ) && is_array( $post['closed_days'] )
 				? array_map( 'absint', $post['closed_days'] )
 				: array(),
@@ -114,7 +119,8 @@ final class SmartRecur_Settings {
 		$out   = array();
 		foreach ( (array) $lines as $line ) {
 			$line = trim( $line );
-			if ( '' === $line ) {
+			// Guard against pathological input; a real date line is short.
+			if ( '' === $line || strlen( $line ) > 40 ) {
 				continue;
 			}
 			$ts = strtotime( $line );
