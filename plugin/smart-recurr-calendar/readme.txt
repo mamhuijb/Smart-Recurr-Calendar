@@ -1,10 +1,10 @@
 === SmartRecur Calendar ===
-Contributors: smartrecur
+Contributors: huijbregts-ict
 Tags: calendar, appointments, scheduling, msp, recurring, office365, syncro
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.4
-Stable tag: 2026.05.3
+Stable tag: 2026.05.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,9 @@ Yes by default. Enable **Settings > Data Management > Delete data on uninstall**
 Use **SmartRecur > Migration Tool** and provide the legacy DB credentials. Customers, services, technicians, and events are copied over.
 
 == Changelog ==
+
+= 2026.05.3.1 =
+* Maintainer/author updated to Huijbregts ICT.
 
 = 2026.05.3 =
 * New: WordPress dashboard widget showing upcoming SmartRecur appointments. Visible to anyone with the `smartrecur_view` capability; honours the per-user "Screen Options" hide/show.

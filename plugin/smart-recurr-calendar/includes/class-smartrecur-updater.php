@@ -233,7 +233,7 @@ final class SmartRecur_Updater {
 			'name'           => 'SmartRecur Calendar',
 			'slug'           => self::plugin_slug(),
 			'version'        => $release['version'],
-			'author'         => '<a href="https://github.com/' . esc_attr( self::GITHUB_OWNER ) . '">SmartRecur</a>',
+			'author'         => '<a href="https://github.com/' . esc_attr( self::GITHUB_OWNER ) . '">Huijbregts ICT</a>',
 			'homepage'       => 'https://github.com/' . self::GITHUB_OWNER . '/' . self::GITHUB_REPO,
 			'requires'       => '6.0',
 			'tested'         => '6.6',
