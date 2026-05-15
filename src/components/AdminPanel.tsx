@@ -449,60 +449,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     };
 
     const handleSaveSettings = async () => {
-        try {
-            // Save app settings to database
-            await api.updateSettings({
-                branding: localSettings.branding,
-                security: localSettings.security,
-                reminders: localSettings.reminders,
-                holidays: localSettings.holidays,
-                manualClosures: localSettings.manualClosures,
-                businessHours: localSettings.businessHours,
-                templates: localSettings.templates,
-                preferredMailMethod: localSettings.preferredMailMethod,
-            });
-
-            // Save integration configs to database
-            const o365Payload: Record<string, any> = {
-                clientId: localSettings.office365.clientId,
-                tenantId: localSettings.office365.tenantId,
-                redirectUri: (localSettings.office365 as any).redirectUri || (window.location.origin + '/api/integrations/office365/callback'),
-            };
-            if ((localSettings.office365 as any).clientSecret) {
-                o365Payload.clientSecret = (localSettings.office365 as any).clientSecret;
+        const failures: string[] = [];
+        const safe = async (label: string, fn: () => Promise<unknown>) => {
+            try { await fn(); } catch (e: any) {
+                failures.push(`${label}: ${e?.message || 'unknown error'}`);
             }
-            await api.saveIntegrationConfig('office365', o365Payload);
-            await api.saveIntegrationConfig('syncro', {
-                apiKey: localSettings.integrations.syncroApiKey,
-                subdomain: localSettings.integrations.syncroSubdomain,
-            });
-            await api.saveIntegrationConfig('invoiceninja', {
-                apiKey: localSettings.integrations.invoiceNinja.apiKey,
-                endpoint: localSettings.integrations.invoiceNinja.endpoint,
-            });
-            await api.saveIntegrationConfig('zoho', {
-                apiKey: localSettings.integrations.zoho.apiKey,
-                apiSecret: localSettings.integrations.zoho.apiSecret,
-                endpoint: localSettings.integrations.zoho.endpoint,
-            });
-            const smtpPayload: Record<string, any> = {
-                host: localSettings.smtp.host,
-                port: localSettings.smtp.port,
-                username: localSettings.smtp.username,
-                fromEmail: localSettings.smtp.fromEmail,
-                fromName: localSettings.smtp.fromName,
-                encryption: localSettings.smtp.encryption,
-            };
-            // Only send password if user entered a new one (don't overwrite stored password with empty string)
-            if (localSettings.smtp.password) {
-                smtpPayload.password = localSettings.smtp.password;
-            }
-            await api.saveIntegrationConfig('smtp', smtpPayload);
+        };
 
-            onUpdateSettings(localSettings);
+        await safe('settings', () => api.updateSettings({
+            branding: localSettings.branding,
+            reminders: localSettings.reminders,
+            holidays: localSettings.holidays,
+            manualClosures: localSettings.manualClosures,
+            businessHours: localSettings.businessHours,
+            templates: localSettings.templates,
+        }));
+
+        const o365Payload: Record<string, any> = {
+            clientId: localSettings.office365.clientId,
+            tenantId: localSettings.office365.tenantId,
+        };
+        await safe('Office 365', () => api.saveIntegrationConfig('office365', o365Payload));
+        await safe('Syncro', () => api.saveIntegrationConfig('syncro', {
+            apiKey: localSettings.integrations.syncroApiKey,
+            subdomain: localSettings.integrations.syncroSubdomain,
+        }));
+        await safe('Invoice Ninja', () => api.saveIntegrationConfig('invoiceninja', {
+            apiKey: localSettings.integrations.invoiceNinja.apiKey,
+            endpoint: localSettings.integrations.invoiceNinja.endpoint,
+        }));
+        await safe('Zoho', () => api.saveIntegrationConfig('zoho', {
+            apiKey: localSettings.integrations.zoho.apiKey,
+            apiSecret: localSettings.integrations.zoho.apiSecret,
+            endpoint: localSettings.integrations.zoho.endpoint,
+        }));
+
+        onUpdateSettings(localSettings);
+        if (failures.length === 0) {
             alert("Configuration saved.");
-        } catch (e: any) {
-            alert(`Save failed: ${e.message}`);
+        } else {
+            alert("Configuration saved, but some items failed:\n\n" + failures.join('\n'));
         }
     };
 
@@ -539,9 +525,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button onClick={() => setActiveTab('BRANDING')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'BRANDING' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <Palette className="w-4 h-4" /> Branding & UI
                     </button>
-                    <button onClick={() => setActiveTab('SECURITY')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'SECURITY' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <ShieldCheck className="w-4 h-4" /> Security (2FA)
-                    </button>
+                    {/* SECURITY (2FA) tab hidden: WordPress handles 2FA via dedicated plugins (WP 2FA, Two-Factor). */}
 
                     <div className="px-2 pb-1 pt-4 text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-wider">Operations</div>
                     <button onClick={() => setActiveTab('CUSTOMERS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'CUSTOMERS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
@@ -562,10 +546,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <ShieldCheck className="w-4 h-4" /> Office 365
                         {integrationStatus.office365?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
                     </button>
-                    <button onClick={() => setActiveTab('SMTP')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'SMTP' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <Bell className="w-4 h-4" /> SMTP Email
-                        {integrationStatus.smtp?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
-                    </button>
+                    {/* SMTP tab hidden: emails go through wp_mail(); install WP Mail SMTP, FluentSMTP, or similar. */}
                     <button onClick={() => setActiveTab('INTEGRATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'INTEGRATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <RefreshCw className="w-4 h-4" /> Syncro MSP
                         {integrationStatus.syncro?.isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ml-auto flex-shrink-0" />}
@@ -583,9 +564,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button onClick={() => setActiveTab('NOTIFICATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'NOTIFICATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <Bell className="w-4 h-4" /> Email & Reminders
                     </button>
-                    <button onClick={() => setActiveTab('PUSH_NOTIFICATIONS')} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'PUSH_NOTIFICATIONS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
-                        <BellRing className="w-4 h-4" /> Push Notifications
-                    </button>
+                    {/* PUSH_NOTIFICATIONS tab hidden: not supported in the WordPress plugin build. */}
                     <button onClick={() => { setActiveTab('EMAIL_LOGS'); if (emailLogs.length === 0) { setLoadingLogs(true); api.getEmailLogs().then(r => setEmailLogs(r.logs || [])).catch(() => {}).finally(() => setLoadingLogs(false)); } }} className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${activeTab === 'EMAIL_LOGS' ? 'bg-primary-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-slate-800'}`}>
                         <FileText className="w-4 h-4" /> Email Logs
                     </button>

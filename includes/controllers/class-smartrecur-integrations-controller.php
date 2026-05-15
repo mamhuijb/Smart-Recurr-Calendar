@@ -195,6 +195,9 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 			'syncro'       => array( 'apiKey', 'subdomain' ),
 			'invoiceninja' => array( 'apiKey', 'endpoint' ),
 			'zoho'         => array( 'apiKey', 'apiSecret', 'endpoint' ),
+			// Accepted for backwards compatibility with the legacy admin UI; emails
+			// in this plugin go through wp_mail() so any SMTP plugin is honoured.
+			'smtp'         => array( 'host', 'port', 'username', 'password', 'fromEmail', 'fromName', 'encryption' ),
 		);
 	}
 
@@ -257,6 +260,14 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 				break;
 			case 'zoho':
 				list( $ok, $msg ) = SmartRecur_Zoho::test( $config );
+				break;
+			case 'smtp':
+				// SMTP is handled by wp_mail() + any installed SMTP plugin. We don't
+				// actually test the SMTP socket here — just confirm wp_mail is callable.
+				$ok  = function_exists( 'wp_mail' );
+				$msg = $ok
+					? __( 'Email is sent via wp_mail(). Configure an SMTP plugin (WP Mail SMTP, FluentSMTP) for delivery.', 'smartrecur' )
+					: __( 'wp_mail() is not available on this site.', 'smartrecur' );
 				break;
 			default:
 				return new WP_Error( 'smartrecur_unknown_integration', __( 'Unknown integration.', 'smartrecur' ), array( 'status' => 400 ) );

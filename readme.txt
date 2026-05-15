@@ -4,7 +4,7 @@ Tags: calendar, appointments, scheduling, msp, recurring, office365, syncro
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.4
-Stable tag: 2026.05.3.1
+Stable tag: 2026.05.3.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,13 @@ Yes by default. Enable **Settings > Data Management > Delete data on uninstall**
 Use **SmartRecur > Migration Tool** and provide the legacy DB credentials. Customers, services, technicians, and events are copied over.
 
 == Changelog ==
+
+= 2026.05.3.2 =
+* Critical fix: REST callbacks were returning null because `WP_REST_Response::set_status()` doesn't return $this. Every create endpoint (customers, services, technicians, appointments, recurring-rules) is fixed; this stops the "There has been a critical error on this website" page from showing when saving a customer or settings.
+* REST error handler wraps every SmartRecur route in try/catch + shutdown safety net, so any future fault returns a clean JSON message rather than the WP critical-error HTML.
+* Schema doctor: on every request (cached for 5 minutes) the plugin verifies expected columns exist on its tables and ALTER TABLE-adds anything missing, in case dbDelta skipped a column on an old install.
+* Removed the legacy 2FA / SMTP / Push tabs from the admin panel. WordPress already handles those — use WP 2FA / Two-Factor for MFA, WP Mail SMTP or FluentSMTP for delivery.
+* Admin "Save Changes" no longer aborts the whole batch if one integration call fails; failures are surfaced in a single summary alert.
 
 = 2026.05.3.1 =
 * Maintainer/author updated to Huijbregts ICT.

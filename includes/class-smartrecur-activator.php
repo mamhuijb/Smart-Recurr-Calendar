@@ -198,6 +198,9 @@ final class SmartRecur_Activator {
 			'syncro'       => array( 'apiKey' => '', 'subdomain' => '' ),
 			'invoiceninja' => array( 'apiKey' => '', 'endpoint' => 'https://app.invoiceninja.com' ),
 			'zoho'         => array( 'apiKey' => '', 'apiSecret' => '', 'endpoint' => 'https://www.zohoapis.com' ),
+			// Stored only so the legacy AdminPanel UI doesn't 404 on status checks.
+			// Email delivery goes through wp_mail() — install an SMTP plugin if needed.
+			'smtp'         => array( 'host' => '', 'port' => 587, 'username' => '', 'fromEmail' => '', 'fromName' => 'SmartRecur', 'encryption' => 'tls' ),
 		);
 
 		foreach ( $defaults as $id => $config ) {

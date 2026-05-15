@@ -36,7 +36,13 @@ final class SmartRecur_Plugin {
 	private function __construct() {
 		load_plugin_textdomain( 'smartrecur', false, dirname( SMARTRECUR_PLUGIN_BASENAME ) . '/languages' );
 
+		// Catch any uncaught Throwable in our REST callbacks so the React client
+		// never has to parse a WP "critical error" HTML page.
+		SmartRecur_Error_Handler::register();
+
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
+		add_action( 'rest_api_init', array( 'SmartRecur_Schema_Doctor', 'ensure' ), 1 );
+		add_action( 'admin_init', array( 'SmartRecur_Schema_Doctor', 'ensure' ) );
 		add_action( 'init', array( $this, 'register_shortcode' ) );
 		add_action( 'init', array( $this, 'maybe_upgrade_db' ) );
 		add_action( 'admin_menu', array( 'SmartRecur_Admin', 'register_menu' ) );
