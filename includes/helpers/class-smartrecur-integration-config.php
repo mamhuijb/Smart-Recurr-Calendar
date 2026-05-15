@@ -101,19 +101,28 @@ final class SmartRecur_Integration_Config {
 	}
 
 	/**
-	 * Return a sanitised version of the config for REST responses (replaces secrets with placeholders).
+	 * Return a sanitised version of the config for REST responses.
+	 *
+	 * - Mask known secret fields with the placeholder string.
+	 * - Drop access/refresh tokens entirely.
+	 * - Drop every underscore-prefixed key (treated as internal state).
 	 *
 	 * @param array $config Raw config.
 	 * @return array
 	 */
 	public static function public_view( array $config ) {
-		$secret_keys = array( 'clientSecret', 'apiKey', 'apiSecret', 'password', 'accessToken', 'refreshToken' );
+		$secret_keys = array( 'clientSecret', 'apiKey', 'apiSecret', 'password' );
 		foreach ( $secret_keys as $key ) {
 			if ( isset( $config[ $key ] ) && '' !== $config[ $key ] ) {
 				$config[ $key ] = '••••••••';
 			}
 		}
-		unset( $config['accessToken'], $config['refreshToken'], $config['_oauth_state'] );
+		unset( $config['accessToken'], $config['refreshToken'], $config['expiresAt'] );
+		foreach ( array_keys( $config ) as $key ) {
+			if ( is_string( $key ) && '' !== $key && '_' === $key[0] ) {
+				unset( $config[ $key ] );
+			}
+		}
 		return $config;
 	}
 }

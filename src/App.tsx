@@ -56,6 +56,8 @@ const App: React.FC<AppProps> = ({ initialView = 'calendar', clientId = '' }) =>
 
   const canManage = smartrecurBootstrap.userCaps.manage;
   const canBook = smartrecurBootstrap.userCaps.book;
+  const canView = smartrecurBootstrap.userCaps.view;
+  const hasNonce = !!smartrecurBootstrap.nonce;
 
   // Theme & branding ------------------------------------------------------
   useEffect(() => {
@@ -70,6 +72,10 @@ const App: React.FC<AppProps> = ({ initialView = 'calendar', clientId = '' }) =>
 
   // Load all data ---------------------------------------------------------
   useEffect(() => {
+    if (!hasNonce || !canView) {
+      setIsLoading(false);
+      return;
+    }
     const load = async () => {
       try {
         const [eventsRes, customersRes, servicesRes, techsRes, settingsRes] = await Promise.all([
@@ -101,7 +107,7 @@ const App: React.FC<AppProps> = ({ initialView = 'calendar', clientId = '' }) =>
       }
     };
     load();
-  }, [clientId]);
+  }, [clientId, hasNonce, canView]);
 
   const handleSaveEvent = async (event: RecurrenceEvent) => {
     try {
@@ -198,6 +204,30 @@ const App: React.FC<AppProps> = ({ initialView = 'calendar', clientId = '' }) =>
     a.download = `smartrecur_export_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
+
+  if (!hasNonce) {
+    return (
+      <div className="smartrecur-wrap p-6 rounded-2xl border border-amber-200 bg-amber-50 text-amber-800">
+        <h3 className="font-semibold mb-1">SmartRecur is not initialised</h3>
+        <p className="text-sm">
+          The plugin's bootstrap data is missing on this page. Add the <code>[smartrecur]</code>
+          shortcode or the SmartRecur Calendar Elementor widget, and make sure you are signed in.
+        </p>
+      </div>
+    );
+  }
+
+  if (!canView) {
+    return (
+      <div className="smartrecur-wrap p-6 rounded-2xl border border-gray-200 bg-gray-50 text-gray-700">
+        <h3 className="font-semibold mb-1">No access to the calendar</h3>
+        <p className="text-sm">
+          Your WordPress account does not have the <code>smartrecur_view</code> capability. Ask an
+          administrator to grant access from <em>SmartRecur &rsaquo; Settings</em>.
+        </p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
