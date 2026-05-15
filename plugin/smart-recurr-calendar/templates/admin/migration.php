@@ -18,6 +18,15 @@ $result = isset( $result ) ? $result : null;
 		<?php esc_html_e( 'Pull data from a legacy SmartRecur MariaDB database into this WordPress install. One-time tool.', 'smartrecur' ); ?>
 	</p>
 
+	<?php if ( ! is_ssl() ) : ?>
+		<div class="notice notice-warning">
+			<p>
+				<strong><?php esc_html_e( 'This admin session is not using HTTPS.', 'smartrecur' ); ?></strong>
+				<?php esc_html_e( 'Database credentials submitted via this form will travel in cleartext. Switch to HTTPS before running the migration.', 'smartrecur' ); ?>
+			</p>
+		</div>
+	<?php endif; ?>
+
 	<?php if ( $result ) : ?>
 		<div class="notice notice-<?php echo ! empty( $result['success'] ) ? 'success' : 'error'; ?>">
 			<p><strong><?php echo esc_html( $result['message'] ?? '' ); ?></strong></p>

@@ -93,6 +93,12 @@ final class SmartRecur_Shortcode {
 		$settings = (array) get_option( 'smartrecur_settings', array() );
 		$timezone = $settings['businessHours']['timezone'] ?? 'Europe/Amsterdam';
 
+		// Build a safe self-URL for login/logout redirects. Strip any control chars and
+		// disallow protocol-relative or off-host paths.
+		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$request_uri = wp_kses_bad_protocol( $request_uri, array( 'http', 'https' ) );
+		$current_url = home_url( $request_uri ?: '/' );
+
 		wp_localize_script(
 			'smartrecur-app',
 			'smartrecurData',
@@ -104,8 +110,8 @@ final class SmartRecur_Shortcode {
 				'userCaps'   => $user_caps,
 				'timezone'   => $timezone,
 				'locale'     => get_locale(),
-				'loginUrl'   => esc_url_raw( wp_login_url( site_url( $_SERVER['REQUEST_URI'] ?? '' ) ) ),
-				'logoutUrl'  => esc_url_raw( wp_logout_url( site_url( $_SERVER['REQUEST_URI'] ?? '' ) ) ),
+				'loginUrl'   => esc_url_raw( wp_login_url( $current_url ) ),
+				'logoutUrl'  => esc_url_raw( wp_logout_url( $current_url ) ),
 				'siteUrl'    => esc_url_raw( site_url() ),
 				'pluginUrl'  => esc_url_raw( SMARTRECUR_PLUGIN_URL ),
 				'version'    => SMARTRECUR_VERSION,

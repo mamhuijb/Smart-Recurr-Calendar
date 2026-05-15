@@ -33,11 +33,35 @@ declare global {
   }
 }
 
+const FALLBACK_BOOTSTRAP: SmartRecurBootstrap = {
+  restUrl: '/',
+  nonce: '',
+  userId: 0,
+  userName: '',
+  userCaps: { manage: false, book: false, view: false, manage_clients: false },
+  timezone: 'Europe/Amsterdam',
+  locale: 'en_US',
+  loginUrl: '/wp-login.php',
+  logoutUrl: '/wp-login.php?action=logout',
+  siteUrl: '/',
+  pluginUrl: '/',
+  version: '0.0.0',
+};
+
+/**
+ * Read the host page's localized bootstrap data. If it's missing — e.g. the
+ * bundle was loaded outside of the shortcode/widget — we return a no-permissions
+ * fallback so the React app can render a friendly "set up the plugin first"
+ * message instead of crashing on module load.
+ */
 const bootstrap = (): SmartRecurBootstrap => {
-  if (!window.smartrecurData) {
-    throw new Error(
-      'SmartRecur bootstrap data missing — the plugin did not localize smartrecurData. Reload the page.',
-    );
+  if (typeof window === 'undefined' || !window.smartrecurData) {
+    if (typeof console !== 'undefined') {
+      console.warn(
+        'SmartRecur: window.smartrecurData missing. Add the [smartrecur] shortcode or Elementor widget to render the calendar.',
+      );
+    }
+    return FALLBACK_BOOTSTRAP;
   }
   return window.smartrecurData;
 };

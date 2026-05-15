@@ -182,14 +182,32 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 	}
 
 	/**
+	 * Whitelist of writable config keys per integration. Keys outside the
+	 * whitelist (including `clientSecret`, `_oauth_state`, `accessToken`,
+	 * `refreshToken`, anything underscore-prefixed) are rejected to prevent
+	 * privilege escalation via the public config endpoint.
+	 *
+	 * @return array<string, string[]>
+	 */
+	private function writable_keys() {
+		return array(
+			'office365'    => array( 'clientId', 'tenantId' ),
+			'syncro'       => array( 'apiKey', 'subdomain' ),
+			'invoiceninja' => array( 'apiKey', 'endpoint' ),
+			'zoho'         => array( 'apiKey', 'apiSecret', 'endpoint' ),
+		);
+	}
+
+	/**
 	 * PUT /integrations/{type}/config
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function save_config( $request ) {
-		$type = sanitize_key( $request['type'] );
-		if ( ! in_array( $type, array( 'office365', 'syncro', 'invoiceninja', 'zoho' ), true ) ) {
+		$type    = sanitize_key( $request['type'] );
+		$allowed = $this->writable_keys();
+		if ( ! isset( $allowed[ $type ] ) ) {
 			return new WP_Error( 'smartrecur_unknown_integration', __( 'Unknown integration.', 'smartrecur' ), array( 'status' => 400 ) );
 		}
 
@@ -200,9 +218,11 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 
 		$existing = SmartRecur_Integration_Config::get( $type );
 
-		// Merge — never overwrite secrets with placeholders.
 		foreach ( $body as $key => $value ) {
 			if ( '••••••••' === $value ) {
+				continue;
+			}
+			if ( ! in_array( $key, $allowed[ $type ], true ) ) {
 				continue;
 			}
 			$existing[ $key ] = is_string( $value ) ? sanitize_text_field( $value ) : $value;
@@ -224,7 +244,9 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 
 		switch ( $type ) {
 			case 'office365':
+				$config = $this->office365_config_with_secret();
 				SmartRecur_Office365::ensure_valid_token( $config );
+				$this->office365_persist( $config );
 				list( $ok, $msg ) = SmartRecur_Office365::test( $config );
 				break;
 			case 'syncro':
@@ -249,6 +271,43 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 	 * ------------------------------------------------------------------- */
 
 	/**
+	 * Transient key for per-user OAuth CSRF state. Each admin who starts a flow
+	 * gets their own isolated state, so concurrent flows from different users
+	 * (or from the same user in multiple tabs) don't clobber each other.
+	 *
+	 * @param string $state State token.
+	 * @return string
+	 */
+	private function oauth_state_key( $state ) {
+		return 'smartrecur_o365_state_' . hash( 'sha256', $state );
+	}
+
+	/**
+	 * Build the configured OAuth client. Injects clientSecret from wp-config.php
+	 * but never persists it back to the DB.
+	 *
+	 * @return array
+	 */
+	private function office365_config_with_secret() {
+		$config = SmartRecur_Integration_Config::get( 'office365' );
+		if ( defined( 'SMARTRECUR_O365_CLIENT_SECRET' ) ) {
+			$config['clientSecret'] = SMARTRECUR_O365_CLIENT_SECRET;
+		}
+		return $config;
+	}
+
+	/**
+	 * Save Office 365 config, scrubbing the in-memory secret so it never reaches
+	 * the database. The constant in wp-config.php remains the only source of truth.
+	 *
+	 * @param array $config Config to persist (mutated: clientSecret removed).
+	 */
+	private function office365_persist( array $config ) {
+		unset( $config['clientSecret'] );
+		SmartRecur_Integration_Config::put( 'office365', $config );
+	}
+
+	/**
 	 * POST /integrations/office365/connect — return the OAuth consent URL.
 	 *
 	 * @return WP_REST_Response
@@ -256,15 +315,20 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 	public function office365_connect() {
 		$config = SmartRecur_Integration_Config::get( 'office365' );
 
-		// Inject the secret from wp-config.php so it's never persisted in the DB.
-		if ( defined( 'SMARTRECUR_O365_CLIENT_SECRET' ) ) {
-			$config['clientSecret'] = SMARTRECUR_O365_CLIENT_SECRET;
-		}
-
 		$config['redirectUri'] = rest_url( SMARTRECUR_REST_NAMESPACE . '/integrations/office365/callback' );
 
-		$state                  = bin2hex( random_bytes( 16 ) );
-		$config['_oauth_state'] = $state;
+		$state = bin2hex( random_bytes( 16 ) );
+		// Store a CSRF token tied to the current admin user (and only this user)
+		// in a 10-minute transient. The callback verifies and consumes it.
+		set_transient(
+			$this->oauth_state_key( $state ),
+			array(
+				'user_id' => get_current_user_id(),
+				'created' => time(),
+			),
+			10 * MINUTE_IN_SECONDS
+		);
+
 		SmartRecur_Integration_Config::put( 'office365', $config );
 
 		return $this->with_no_store( rest_ensure_response( array( 'url' => SmartRecur_Office365::get_auth_url( $config, $state ) ) ) );
@@ -280,20 +344,26 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 		$code  = sanitize_text_field( (string) $request->get_param( 'code' ) );
 		$state = sanitize_text_field( (string) $request->get_param( 'state' ) );
 
-		$config = SmartRecur_Integration_Config::get( 'office365' );
-		$expected = $config['_oauth_state'] ?? '';
-
-		if ( ! $code || ! $expected || ! hash_equals( $expected, $state ) ) {
-			return $this->oauth_html( false, __( 'Invalid OAuth state.', 'smartrecur' ) );
+		if ( ! $code || ! $state ) {
+			return $this->oauth_html( false, __( 'Missing OAuth code or state.', 'smartrecur' ) );
 		}
-		unset( $config['_oauth_state'] );
 
-		if ( defined( 'SMARTRECUR_O365_CLIENT_SECRET' ) ) {
-			$config['clientSecret'] = SMARTRECUR_O365_CLIENT_SECRET;
+		// Validate and atomically consume the state (transient delete prevents replay).
+		$state_key = $this->oauth_state_key( $state );
+		$stored    = get_transient( $state_key );
+		delete_transient( $state_key );
+
+		if ( ! is_array( $stored ) || empty( $stored['user_id'] ) ) {
+			return $this->oauth_html( false, __( 'OAuth state expired or unknown. Start the connection again.', 'smartrecur' ) );
 		}
+		if ( get_current_user_id() && (int) $stored['user_id'] !== get_current_user_id() ) {
+			return $this->oauth_html( false, __( 'OAuth state belongs to a different user.', 'smartrecur' ) );
+		}
+
+		$config = $this->office365_config_with_secret();
 
 		$result = SmartRecur_Office365::exchange_code( $code, $config );
-		if ( ! $result['success'] ) {
+		if ( empty( $result['success'] ) ) {
 			return $this->oauth_html( false, $result['error'] ?? 'Token exchange failed' );
 		}
 
@@ -302,7 +372,7 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 		$config['expiresAt']    = $result['expiresAt'] ?? ( time() + 3600 );
 		$config['userEmail']    = $result['email'] ?? '';
 
-		SmartRecur_Integration_Config::put( 'office365', $config );
+		$this->office365_persist( $config );
 		SmartRecur_Integration_Config::set_status( 'office365', true );
 
 		return $this->oauth_html( true, '', $config['userEmail'] );
@@ -310,6 +380,11 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 
 	/**
 	 * Render the OAuth popup completion page (postMessage back to opener).
+	 *
+	 * WordPress's REST server forces a JSON content type and serializes responses
+	 * to JSON by default. To return raw HTML, we register a `rest_pre_serve_request`
+	 * filter that overrides the Content-Type header, echoes the HTML, and returns
+	 * true so the server skips its normal serialization step.
 	 *
 	 * @param bool   $success Outcome.
 	 * @param string $error   Error message.
@@ -321,26 +396,32 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 			? wp_json_encode( array( 'type' => 'OAUTH_SUCCESS', 'email' => $email ), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT )
 			: wp_json_encode( array( 'type' => 'OAUTH_ERROR', 'error' => $error ), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
 
-		$origin     = wp_json_encode( site_url() );
-		$heading    = $success
+		$origin  = wp_json_encode( site_url() );
+		$heading = $success
 			? esc_html( sprintf( __( 'Connected as %s. You can close this window.', 'smartrecur' ), $email ) )
 			: esc_html( sprintf( __( 'Error: %s', 'smartrecur' ), $error ) );
 
-		$html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>OAuth</title></head>';
+		$html  = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>OAuth</title></head>';
 		$html .= '<body><h3>' . $heading . '</h3>';
 		$html .= '<script>if(window.opener){window.opener.postMessage(' . $payload . ',' . $origin . ');}window.close();</script>';
 		$html .= '</body></html>';
 
-		$response = new WP_REST_Response( null );
-		$response->header( 'Content-Type', 'text/html; charset=UTF-8' );
-		$response->header( 'Cache-Control', 'no-store, private' );
-		$response->set_data( $html );
-		// Tell the REST server to send the raw HTML instead of JSON.
-		add_filter( 'rest_pre_serve_request', function ( $served, $r ) use ( $html ) {
-			echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — pre-escaped above.
-			return true;
-		}, 10, 2 );
-		return $response;
+		add_filter(
+			'rest_pre_serve_request',
+			function ( $served ) use ( $html ) {
+				// Overwrite the Content-Type already sent by the REST server.
+				if ( ! headers_sent() ) {
+					header( 'Content-Type: text/html; charset=UTF-8' );
+					header( 'Cache-Control: no-store, private, max-age=0' );
+					header( 'X-LiteSpeed-Cache-Control: no-cache, no-vary' );
+				}
+				echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — content is pre-escaped above.
+				return true;
+			},
+			999
+		);
+
+		return new WP_REST_Response( null, 200 );
 	}
 
 	/**
@@ -353,7 +434,7 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 		foreach ( array( 'accessToken', 'refreshToken', 'expiresAt', 'userEmail' ) as $key ) {
 			unset( $config[ $key ] );
 		}
-		SmartRecur_Integration_Config::put( 'office365', $config );
+		$this->office365_persist( $config );
 		SmartRecur_Integration_Config::set_status( 'office365', false );
 		return $this->with_no_store( rest_ensure_response( array( 'success' => true ) ) );
 	}
@@ -365,12 +446,9 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function office365_sync( $request ) {
-		$config = SmartRecur_Integration_Config::get( 'office365' );
-		if ( defined( 'SMARTRECUR_O365_CLIENT_SECRET' ) ) {
-			$config['clientSecret'] = SMARTRECUR_O365_CLIENT_SECRET;
-		}
+		$config = $this->office365_config_with_secret();
 		SmartRecur_Office365::ensure_valid_token( $config );
-		SmartRecur_Integration_Config::put( 'office365', $config );
+		$this->office365_persist( $config );
 
 		$calendar_id = sanitize_text_field( (string) $request['calendarId'] );
 		$event       = array(
@@ -390,7 +468,7 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 		);
 
 		$result = SmartRecur_Office365::create_calendar_event( $config, $event, $calendar_id );
-		if ( ! $result['success'] ) {
+		if ( empty( $result['success'] ) ) {
 			return new WP_Error( 'smartrecur_o365_sync_failed', $result['error'] ?? 'Sync failed', array( 'status' => 502 ) );
 		}
 		return $this->with_no_store( rest_ensure_response( $result ) );
@@ -402,12 +480,9 @@ final class SmartRecur_Integrations_Controller extends WP_REST_Controller {
 	 * @return WP_REST_Response
 	 */
 	public function office365_calendars() {
-		$config = SmartRecur_Integration_Config::get( 'office365' );
-		if ( defined( 'SMARTRECUR_O365_CLIENT_SECRET' ) ) {
-			$config['clientSecret'] = SMARTRECUR_O365_CLIENT_SECRET;
-		}
+		$config = $this->office365_config_with_secret();
 		SmartRecur_Office365::ensure_valid_token( $config );
-		SmartRecur_Integration_Config::put( 'office365', $config );
+		$this->office365_persist( $config );
 
 		return $this->with_no_store( rest_ensure_response( array( 'calendars' => SmartRecur_Office365::get_calendars( $config ) ) ) );
 	}
