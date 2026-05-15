@@ -1,6 +1,6 @@
 {
   "name": "smartrecur-calendar-wp",
-  "version": "2026.05.2",
+  "version": "2026.05.3",
   "private": true,
   "type": "module",
   "description": "WordPress plugin build for the SmartRecur Calendar React app.",

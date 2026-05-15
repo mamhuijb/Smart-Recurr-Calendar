@@ -221,6 +221,13 @@ final class SmartRecur_Admin {
 		$reminders = isset( $_POST['reminder_days'] ) ? sanitize_text_field( wp_unslash( $_POST['reminder_days'] ) ) : '';
 		$settings['reminders']['days'] = array_values( array_filter( array_map( 'absint', explode( ',', $reminders ) ) ) );
 
+		// Dashboard widget.
+		$settings['dashboardWidget'] = array(
+			'enabled'   => ! empty( $_POST['dashboard_widget_enabled'] ),
+			'limit'     => isset( $_POST['dashboard_widget_limit'] ) ? max( 1, min( 50, absint( $_POST['dashboard_widget_limit'] ) ) ) : 10,
+			'daysAhead' => isset( $_POST['dashboard_widget_days'] ) ? max( 1, min( 365, absint( $_POST['dashboard_widget_days'] ) ) ) : 30,
+		);
+
 		// Data management.
 		$settings['deleteDataOnUninstall'] = ! empty( $_POST['delete_data_on_uninstall'] );
 

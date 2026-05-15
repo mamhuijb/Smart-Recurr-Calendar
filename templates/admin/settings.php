@@ -19,6 +19,10 @@ $notifications   = $settings['notifications'] ?? array();
 $template_subject = $settings['templates']['reminder']['subject'] ?? '';
 $template_body    = $settings['templates']['reminder']['body'] ?? '';
 $delete_on_unin   = ! empty( $settings['deleteDataOnUninstall'] );
+$widget           = isset( $settings['dashboardWidget'] ) && is_array( $settings['dashboardWidget'] ) ? $settings['dashboardWidget'] : array();
+$widget_enabled   = array_key_exists( 'enabled', $widget ) ? (bool) $widget['enabled'] : true;
+$widget_limit     = isset( $widget['limit'] ) ? (int) $widget['limit'] : 10;
+$widget_days      = isset( $widget['daysAhead'] ) ? (int) $widget['daysAhead'] : 30;
 $days_of_week     = array(
 	0 => __( 'Sunday', 'smartrecur' ),
 	1 => __( 'Monday', 'smartrecur' ),
@@ -131,6 +135,36 @@ $timezones        = timezone_identifiers_list();
 				<td>
 					<textarea name="template_body" rows="6" class="large-text"><?php echo esc_textarea( $template_body ); ?></textarea>
 					<p class="description"><?php esc_html_e( 'Tokens: {customer_name}, {service_name}, {tech_name}, {date}, {location_type}, {company_name}, {link}', 'smartrecur' ); ?></p>
+				</td>
+			</tr>
+		</table>
+
+		<h2 id="dashboard-widget"><?php esc_html_e( 'Dashboard Widget', 'smartrecur' ); ?></h2>
+		<p class="description">
+			<?php esc_html_e( 'Show upcoming appointments on the main WordPress dashboard. Visible to users with the smartrecur_view capability.', 'smartrecur' ); ?>
+		</p>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th><?php esc_html_e( 'Enable widget', 'smartrecur' ); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="dashboard_widget_enabled" value="1" <?php checked( $widget_enabled ); ?>>
+						<?php esc_html_e( 'Display the "Upcoming Appointments" widget on the WordPress dashboard.', 'smartrecur' ); ?>
+					</label>
+				</td>
+			</tr>
+			<tr>
+				<th><label for="dashboard_widget_limit"><?php esc_html_e( 'Items to show', 'smartrecur' ); ?></label></th>
+				<td>
+					<input type="number" id="dashboard_widget_limit" name="dashboard_widget_limit" min="1" max="50" value="<?php echo esc_attr( $widget_limit ); ?>">
+					<p class="description"><?php esc_html_e( 'Maximum number of upcoming appointments to list (1–50).', 'smartrecur' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th><label for="dashboard_widget_days"><?php esc_html_e( 'Days ahead', 'smartrecur' ); ?></label></th>
+				<td>
+					<input type="number" id="dashboard_widget_days" name="dashboard_widget_days" min="1" max="365" value="<?php echo esc_attr( $widget_days ); ?>">
+					<p class="description"><?php esc_html_e( 'Only show appointments within this many days from today (1–365).', 'smartrecur' ); ?></p>
 				</td>
 			</tr>
 		</table>

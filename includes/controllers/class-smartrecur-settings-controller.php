@@ -92,7 +92,7 @@ final class SmartRecur_Settings_Controller extends WP_REST_Controller {
 		}
 
 		$current = (array) get_option( 'smartrecur_settings', array() );
-		$valid   = array( 'branding', 'businessHours', 'reminders', 'holidays', 'manualClosures', 'durations', 'bookingRules', 'notifications', 'templates', 'deleteDataOnUninstall' );
+		$valid   = array( 'branding', 'businessHours', 'reminders', 'holidays', 'manualClosures', 'durations', 'bookingRules', 'notifications', 'templates', 'deleteDataOnUninstall', 'dashboardWidget' );
 
 		foreach ( $body as $key => $value ) {
 			if ( ! in_array( $key, $valid, true ) ) {
