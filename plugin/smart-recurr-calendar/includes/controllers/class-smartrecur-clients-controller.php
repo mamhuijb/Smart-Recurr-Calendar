@@ -141,7 +141,7 @@ final class SmartRecur_Clients_Controller extends WP_REST_Controller {
 			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d' )
 		);
 
-		return $this->with_no_store( rest_ensure_response( array( 'customer' => array( 'id' => $id ) ) ) )->set_status( 201 );
+		return $this->with_no_store( rest_ensure_response( array( 'customer' => array( 'id' => $id ) ) ), 201 );
 	}
 
 	/**

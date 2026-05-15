@@ -190,7 +190,7 @@ final class SmartRecur_Appointments_Controller extends WP_REST_Controller {
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %s", $id ), ARRAY_A );
 		$this->purge_caches();
 
-		return $this->with_no_store( rest_ensure_response( array( 'event' => $this->to_frontend( $row ) ) ) )->set_status( 201 );
+		return $this->with_no_store( rest_ensure_response( array( 'event' => $this->to_frontend( $row ) ) ), 201 );
 	}
 
 	/**

@@ -33,12 +33,19 @@ trait SmartRecur_REST_Security {
 	 * Emit Cache-Control headers that mark user-specific REST responses as private,
 	 * preventing LiteSpeed / Varnish / browser shared caches from storing them.
 	 *
+	 * Optionally set the HTTP status code. WP_REST_Response::set_status() returns
+	 * void, so wrapping it here lets controllers keep using a fluent return.
+	 *
 	 * @param WP_REST_Response $response Response.
+	 * @param int|null         $status   Optional HTTP status to apply.
 	 * @return WP_REST_Response
 	 */
-	protected function with_no_store( WP_REST_Response $response ) {
+	protected function with_no_store( WP_REST_Response $response, $status = null ) {
 		$response->header( 'Cache-Control', 'no-store, private, max-age=0' );
 		$response->header( 'X-LiteSpeed-Cache-Control', 'no-cache, no-vary' );
+		if ( null !== $status ) {
+			$response->set_status( (int) $status );
+		}
 		return $response;
 	}
 

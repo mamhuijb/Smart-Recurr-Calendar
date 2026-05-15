@@ -106,7 +106,7 @@ final class SmartRecur_Technicians_Controller extends WP_REST_Controller {
 			array( '%s', '%s', '%s', '%s', '%s' )
 		);
 
-		return $this->with_no_store( rest_ensure_response( array( 'technician' => array( 'id' => $id ) ) ) )->set_status( 201 );
+		return $this->with_no_store( rest_ensure_response( array( 'technician' => array( 'id' => $id ) ) ), 201 );
 	}
 
 	/**
