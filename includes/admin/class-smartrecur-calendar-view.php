@@ -53,17 +53,28 @@ final class SmartRecur_Calendar_View {
 		$first_dow   = (int) gmdate( 'w', mktime( 0, 0, 0, $month, 1, $year ) ); // 0 = Sunday.
 		$days_in_mo  = (int) gmdate( 't', mktime( 0, 0, 0, $month, 1, $year ) );
 
+		$settings    = (array) get_option( 'smartrecur_settings', array() );
+		$hours       = $settings['businessHours'] ?? array();
+		$closed_days = array_map( 'intval', $hours['closedDays'] ?? array() );
+		$holidays    = (array) ( $settings['holidays'] ?? array() );
+		$closures    = (array) ( $settings['manualClosures'] ?? array() );
+
+		// Calendar is laid out Monday-first; convert PHP's Sunday=0 offset.
+		$lead = ( $first_dow + 6 ) % 7;
+
 		// Build a flat list of cells: leading blanks + day cells + trailing blanks.
 		$cells = array();
-		for ( $i = 0; $i < $first_dow; $i++ ) {
+		for ( $i = 0; $i < $lead; $i++ ) {
 			$cells[] = null;
 		}
 		for ( $d = 1; $d <= $days_in_mo; $d++ ) {
 			$date    = sprintf( '%04d-%02d-%02d', $year, $month, $d );
+			$dow     = (int) gmdate( 'w', mktime( 0, 0, 0, $month, $d, $year ) );
 			$cells[] = array(
 				'day'     => $d,
 				'date'    => $date,
 				'today'   => ( $date === $today ),
+				'closed'  => in_array( $dow, $closed_days, true ) || in_array( $date, $holidays, true ) || in_array( $date, $closures, true ),
 				'events'  => $occurrences[ $date ] ?? array(),
 			);
 		}
@@ -92,7 +103,63 @@ final class SmartRecur_Calendar_View {
 			'today_url'      => add_query_arg( array( 'year' => (int) substr( $today, 0, 4 ), 'month' => (int) substr( $today, 5, 2 ) ), $base ),
 			'weekday_labels' => self::weekday_labels(),
 			'can_book'       => current_user_can( 'smartrecur_book' ),
+			'hours_label'    => ( $hours['start'] ?? '09:00' ) . ' – ' . ( $hours['end'] ?? '17:00' ),
+			'upcoming'       => self::upcoming( 90, $add_url ),
 		);
+	}
+
+	/**
+	 * Upcoming appointment occurrences within the next N days, sorted by date.
+	 *
+	 * @param int    $days    Look-ahead window.
+	 * @param string $add_url Base edit URL.
+	 * @return array
+	 */
+	public static function upcoming( $days = 90, $add_url = '' ) {
+		$appointments = SmartRecur_Data::get_appointments();
+		$clients      = SmartRecur_Data::index_by_id( SmartRecur_Data::get_clients(), 'company', 'name' );
+		$services     = array();
+		foreach ( SmartRecur_Data::get_services() as $svc ) {
+			$services[ $svc['id'] ] = $svc;
+		}
+
+		$today  = current_time( 'Y-m-d' );
+		$cutoff = gmdate( 'Y-m-d', strtotime( '+' . (int) $days . ' days', strtotime( $today ) ) );
+		$out    = array();
+
+		foreach ( $appointments as $appt ) {
+			$dates = json_decode( $appt['generated_dates'] ?? '[]', true );
+			if ( ! is_array( $dates ) ) {
+				continue;
+			}
+			$svc = $services[ $appt['service_id'] ] ?? null;
+			foreach ( $dates as $date ) {
+				if ( $date < $today || $date > $cutoff ) {
+					continue;
+				}
+				$out[] = array(
+					'id'       => $appt['id'],
+					'title'    => $appt['title'],
+					'client'   => $clients[ $appt['client_id'] ] ?? '',
+					'date'     => $date,
+					'time'     => $appt['start_time'] ?? '',
+					'color'    => $svc['color'] ?? '#6366f1',
+					'status'   => $appt['status'],
+					'edit_url' => $add_url
+						? add_query_arg( array( 'action' => 'edit', 'id' => $appt['id'] ), remove_query_arg( 'date', $add_url ) )
+						: '',
+				);
+			}
+		}
+
+		usort(
+			$out,
+			static function ( $a, $b ) {
+				return strcmp( $a['date'] . $a['time'], $b['date'] . $b['time'] );
+			}
+		);
+
+		return $out;
 	}
 
 	/**
