@@ -4,7 +4,7 @@ Tags: calendar, appointments, scheduling, msp, recurring, office365, syncro
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.4
-Stable tag: 3.0.0
+Stable tag: 2026.05.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,5 +79,13 @@ Use **SmartRecur > Migration Tool** and provide the legacy DB credentials. Custo
 
 == Changelog ==
 
-= 3.0.0 =
-* Initial WordPress plugin release. Replaces JWT auth with WP auth, removes custom users table, rewires every API endpoint onto WP REST under `smartrecur/v1`, adds a shortcode and Elementor widget.
+= 2026.05.1 =
+* First public WordPress plugin release.
+* Replaces the legacy JWT authentication and custom users table with the native WordPress user system + capabilities (`smartrecur_manage`, `smartrecur_book`, `smartrecur_view`, `smartrecur_manage_clients`).
+* Every endpoint moves to the WordPress REST API under `smartrecur/v1` with `permission_callback`, capability checks, and `X-WP-Nonce` enforcement.
+* Tables created automatically via `dbDelta()` on activation; schema version tracked in `smartrecur_db_version` for future incremental migrations.
+* Integration secrets (Office 365, Syncro MSP, Invoice Ninja, Zoho) encrypted at rest with `AUTH_SALT`-derived keys and never returned in REST responses.
+* OAuth state lives in per-user transients to prevent concurrent-flow collisions.
+* `[smartrecur]` shortcode + Elementor V3 widget; Tailwind styles scoped under `.smartrecur-wrap`.
+* Email switched to `wp_mail()` so any WP SMTP plugin (WP Mail SMTP, FluentSMTP, etc.) is honoured.
+* Includes a one-shot migration tool that pulls customers / services / technicians / events from a legacy standalone SmartRecur MariaDB database.

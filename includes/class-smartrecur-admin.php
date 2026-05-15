@@ -12,6 +12,37 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class SmartRecur_Admin {
 
 	/**
+	 * Display a one-shot "welcome" admin notice immediately after activation,
+	 * pointing the admin at the Integrations and Settings screens. The notice is
+	 * driven by a 60-second transient set in the activator.
+	 */
+	public static function maybe_welcome_notice() {
+		if ( ! get_transient( 'smartrecur_just_activated' ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'smartrecur_manage' ) ) {
+			return;
+		}
+		delete_transient( 'smartrecur_just_activated' );
+
+		$integrations = esc_url( admin_url( 'admin.php?page=smartrecur-integrations' ) );
+		$settings     = esc_url( admin_url( 'admin.php?page=smartrecur-settings' ) );
+
+		echo '<div class="notice notice-success is-dismissible"><p>';
+		echo '<strong>' . esc_html__( 'SmartRecur Calendar is installed and ready.', 'smartrecur' ) . '</strong> ';
+		echo wp_kses(
+			sprintf(
+				/* translators: %1$s integrations URL, %2$s settings URL */
+				__( 'Next: <a href="%1$s">connect your integrations</a> and review your <a href="%2$s">business hours</a>. Add <code>[smartrecur]</code> to any page to display the calendar.', 'smartrecur' ),
+				$integrations,
+				$settings
+			),
+			array( 'a' => array( 'href' => array() ), 'code' => array() )
+		);
+		echo '</p></div>';
+	}
+
+	/**
 	 * Register admin menu + submenus.
 	 */
 	public static function register_menu() {
