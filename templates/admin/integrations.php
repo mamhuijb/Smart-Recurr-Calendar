@@ -1,6 +1,9 @@
 <?php
 /**
- * Integrations admin form.
+ * Integrations screen.
+ *
+ * Expects: $integrations (array from SmartRecur_Integration_Config::all()),
+ * $o365_ready (bool — whether the bundled/overridden client ID is set).
  *
  * @package SmartRecur
  */
@@ -10,89 +13,117 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /** @var array $integrations */
-$integrations = isset( $integrations ) ? $integrations : array();
-
-$mask = function ( $value ) {
+/** @var bool $o365_ready */
+$mask = static function ( $value ) {
 	return '' !== (string) $value ? '••••••••' : '';
 };
-
-$callback_url = rest_url( SMARTRECUR_REST_NAMESPACE . '/integrations/office365/callback' );
+$o365          = $integrations['office365'] ?? array( 'isConnected' => false, 'config' => array() );
+$o365_config   = $o365['config'] ?? array();
+$o365_email    = $o365_config['userEmail'] ?? '';
+$o365_calendar = $o365_config['calendarName'] ?? '';
+$o365_last     = isset( $o365_config['lastSyncedAt'] ) ? (int) $o365_config['lastSyncedAt'] : 0;
+$syncro        = $integrations['syncro']['config'] ?? array();
+$invoiceninja  = $integrations['invoiceninja']['config'] ?? array();
+$zoho          = $integrations['zoho']['config'] ?? array();
 ?>
-<div class="wrap">
+<div class="wrap smartrecur-admin">
 	<h1><?php esc_html_e( 'SmartRecur Integrations', 'smartrecur' ); ?></h1>
-	<p class="description">
-		<?php esc_html_e( 'Connect SmartRecur to Office 365, Syncro MSP, Invoice Ninja, and Zoho. Secrets are encrypted at rest.', 'smartrecur' ); ?>
-	</p>
+
+	<div class="smartrecur-card">
+		<h2><?php esc_html_e( 'Office 365 Calendar', 'smartrecur' ); ?></h2>
+
+		<?php if ( ! $o365_ready ) : ?>
+			<div class="notice notice-warning inline">
+				<p>
+					<?php esc_html_e( 'Office 365 is not configured yet. The plugin author must set the bundled Microsoft Graph client ID, or you can define SMARTRECUR_O365_CLIENT_ID in wp-config.php. See the plugin README for the one-time Azure setup.', 'smartrecur' ); ?>
+				</p>
+			</div>
+		<?php elseif ( ! empty( $o365['isConnected'] ) ) : ?>
+			<p>
+				<span class="smartrecur-badge smartrecur-badge-ok"><?php esc_html_e( 'Connected', 'smartrecur' ); ?></span>
+				<?php echo esc_html( $o365_email ); ?>
+			</p>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th><label for="sr-o365-calendar"><?php esc_html_e( 'Calendar to sync', 'smartrecur' ); ?></label></th>
+					<td>
+						<select id="sr-o365-calendar" data-current="<?php echo esc_attr( $o365_config['calendarId'] ?? '' ); ?>">
+							<option value=""><?php esc_html_e( 'Loading calendars…', 'smartrecur' ); ?></option>
+						</select>
+						<button type="button" class="button" id="sr-o365-save-calendar"><?php esc_html_e( 'Use this calendar', 'smartrecur' ); ?></button>
+						<?php if ( $o365_calendar ) : ?>
+							<p class="description"><?php echo esc_html( sprintf( /* translators: %s calendar name */ __( 'Currently syncing: %s', 'smartrecur' ), $o365_calendar ) ); ?></p>
+						<?php endif; ?>
+					</td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Two-way sync', 'smartrecur' ); ?></th>
+					<td>
+						<button type="button" class="button button-secondary" id="sr-o365-sync-now"><?php esc_html_e( 'Sync now', 'smartrecur' ); ?></button>
+						<button type="button" class="button" id="sr-o365-disconnect"><?php esc_html_e( 'Disconnect', 'smartrecur' ); ?></button>
+						<p class="description">
+							<?php
+							if ( $o365_last ) {
+								echo esc_html( sprintf( /* translators: %s human time diff */ __( 'Last synced %s ago.', 'smartrecur' ), human_time_diff( $o365_last ) ) );
+							} else {
+								esc_html_e( 'Appointments push to Outlook instantly; Outlook changes pull in every 15 minutes.', 'smartrecur' );
+							}
+							?>
+						</p>
+					</td>
+				</tr>
+			</table>
+		<?php else : ?>
+			<p><span class="smartrecur-badge smartrecur-badge-off"><?php esc_html_e( 'Not connected', 'smartrecur' ); ?></span></p>
+			<p><button type="button" class="button button-primary" id="sr-o365-connect"><?php esc_html_e( 'Connect to Office 365', 'smartrecur' ); ?></button></p>
+			<p class="description"><?php esc_html_e( 'Opens a Microsoft sign-in window. After you consent, pick a calendar and two-way sync starts automatically.', 'smartrecur' ); ?></p>
+		<?php endif; ?>
+	</div>
 
 	<form method="post">
 		<?php wp_nonce_field( 'smartrecur_integrations' ); ?>
 
-		<h2><?php esc_html_e( 'Office 365', 'smartrecur' ); ?></h2>
-		<p class="description">
-			<?php esc_html_e( 'OAuth callback URL (register this in Azure AD):', 'smartrecur' ); ?>
-			<code><?php echo esc_html( $callback_url ); ?></code>
-		</p>
-		<p class="description">
-			<?php
-			printf(
-				/* translators: %s: php constant name */
-				esc_html__( 'Add %s to wp-config.php; the secret is never stored in the database.', 'smartrecur' ),
-				'<code>define( \'SMARTRECUR_O365_CLIENT_SECRET\', \'...\' );</code>'
-			);
-			?>
-		</p>
-		<table class="form-table" role="presentation">
-			<tr>
-				<th><label for="o365_client_id"><?php esc_html_e( 'Client ID', 'smartrecur' ); ?></label></th>
-				<td><input type="text" id="o365_client_id" name="office365[clientId]" class="regular-text" value="<?php echo esc_attr( $integrations['office365']['config']['clientId'] ?? '' ); ?>"></td>
-			</tr>
-			<tr>
-				<th><label for="o365_tenant_id"><?php esc_html_e( 'Tenant ID', 'smartrecur' ); ?></label></th>
-				<td><input type="text" id="o365_tenant_id" name="office365[tenantId]" class="regular-text" value="<?php echo esc_attr( $integrations['office365']['config']['tenantId'] ?? 'common' ); ?>"></td>
-			</tr>
-			<tr>
-				<th><?php esc_html_e( 'Status', 'smartrecur' ); ?></th>
-				<td>
-					<?php echo ! empty( $integrations['office365']['isConnected'] ) ? '<span style="color:#46b450">' . esc_html__( 'Connected', 'smartrecur' ) . '</span>' : '<span style="color:#a00">' . esc_html__( 'Disconnected', 'smartrecur' ) . '</span>'; ?>
-				</td>
-			</tr>
-		</table>
+		<div class="smartrecur-card">
+			<h2><?php esc_html_e( 'Syncro MSP', 'smartrecur' ); ?></h2>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th><label for="sr-syncro-sub"><?php esc_html_e( 'Subdomain', 'smartrecur' ); ?></label></th>
+					<td><input type="text" id="sr-syncro-sub" name="syncro[subdomain]" class="regular-text" value="<?php echo esc_attr( $syncro['subdomain'] ?? '' ); ?>"> <span class="description">.syncromsp.com</span></td>
+				</tr>
+				<tr>
+					<th><label for="sr-syncro-key"><?php esc_html_e( 'API key', 'smartrecur' ); ?></label></th>
+					<td><input type="password" id="sr-syncro-key" name="syncro[apiKey]" class="regular-text" value="<?php echo esc_attr( $mask( $syncro['apiKey'] ?? '' ) ); ?>" autocomplete="off"></td>
+				</tr>
+			</table>
+		</div>
 
-		<h2><?php esc_html_e( 'Syncro MSP', 'smartrecur' ); ?></h2>
-		<table class="form-table" role="presentation">
-			<tr>
-				<th><label for="syncro_subdomain"><?php esc_html_e( 'Subdomain', 'smartrecur' ); ?></label></th>
-				<td><input type="text" id="syncro_subdomain" name="syncro[subdomain]" class="regular-text" value="<?php echo esc_attr( $integrations['syncro']['config']['subdomain'] ?? '' ); ?>"> <span class="description">.syncromsp.com</span></td>
-			</tr>
-			<tr>
-				<th><label for="syncro_api_key"><?php esc_html_e( 'API Key', 'smartrecur' ); ?></label></th>
-				<td><input type="password" id="syncro_api_key" name="syncro[apiKey]" class="regular-text" value="<?php echo esc_attr( $mask( $integrations['syncro']['config']['apiKey'] ?? '' ) ); ?>" autocomplete="off"></td>
-			</tr>
-		</table>
+		<div class="smartrecur-card">
+			<h2><?php esc_html_e( 'Invoice Ninja', 'smartrecur' ); ?></h2>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th><label for="sr-in-endpoint"><?php esc_html_e( 'Endpoint URL', 'smartrecur' ); ?></label></th>
+					<td><input type="url" id="sr-in-endpoint" name="invoiceninja[endpoint]" class="regular-text" value="<?php echo esc_attr( $invoiceninja['endpoint'] ?? 'https://app.invoiceninja.com' ); ?>"></td>
+				</tr>
+				<tr>
+					<th><label for="sr-in-key"><?php esc_html_e( 'API key', 'smartrecur' ); ?></label></th>
+					<td><input type="password" id="sr-in-key" name="invoiceninja[apiKey]" class="regular-text" value="<?php echo esc_attr( $mask( $invoiceninja['apiKey'] ?? '' ) ); ?>" autocomplete="off"></td>
+				</tr>
+			</table>
+		</div>
 
-		<h2><?php esc_html_e( 'Invoice Ninja', 'smartrecur' ); ?></h2>
-		<table class="form-table" role="presentation">
-			<tr>
-				<th><label for="in_endpoint"><?php esc_html_e( 'Endpoint URL', 'smartrecur' ); ?></label></th>
-				<td><input type="url" id="in_endpoint" name="invoiceninja[endpoint]" class="regular-text" value="<?php echo esc_attr( $integrations['invoiceninja']['config']['endpoint'] ?? 'https://app.invoiceninja.com' ); ?>"></td>
-			</tr>
-			<tr>
-				<th><label for="in_api_key"><?php esc_html_e( 'API Key', 'smartrecur' ); ?></label></th>
-				<td><input type="password" id="in_api_key" name="invoiceninja[apiKey]" class="regular-text" value="<?php echo esc_attr( $mask( $integrations['invoiceninja']['config']['apiKey'] ?? '' ) ); ?>" autocomplete="off"></td>
-			</tr>
-		</table>
-
-		<h2><?php esc_html_e( 'Zoho', 'smartrecur' ); ?></h2>
-		<table class="form-table" role="presentation">
-			<tr>
-				<th><label for="zoho_endpoint"><?php esc_html_e( 'Endpoint URL', 'smartrecur' ); ?></label></th>
-				<td><input type="url" id="zoho_endpoint" name="zoho[endpoint]" class="regular-text" value="<?php echo esc_attr( $integrations['zoho']['config']['endpoint'] ?? 'https://www.zohoapis.com' ); ?>"></td>
-			</tr>
-			<tr>
-				<th><label for="zoho_api_key"><?php esc_html_e( 'Access Token', 'smartrecur' ); ?></label></th>
-				<td><input type="password" id="zoho_api_key" name="zoho[apiKey]" class="regular-text" value="<?php echo esc_attr( $mask( $integrations['zoho']['config']['apiKey'] ?? '' ) ); ?>" autocomplete="off"></td>
-			</tr>
-		</table>
+		<div class="smartrecur-card">
+			<h2><?php esc_html_e( 'Zoho', 'smartrecur' ); ?></h2>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th><label for="sr-zoho-endpoint"><?php esc_html_e( 'Endpoint URL', 'smartrecur' ); ?></label></th>
+					<td><input type="url" id="sr-zoho-endpoint" name="zoho[endpoint]" class="regular-text" value="<?php echo esc_attr( $zoho['endpoint'] ?? 'https://www.zohoapis.com' ); ?>"></td>
+				</tr>
+				<tr>
+					<th><label for="sr-zoho-key"><?php esc_html_e( 'Access token', 'smartrecur' ); ?></label></th>
+					<td><input type="password" id="sr-zoho-key" name="zoho[apiKey]" class="regular-text" value="<?php echo esc_attr( $mask( $zoho['apiKey'] ?? '' ) ); ?>" autocomplete="off"></td>
+				</tr>
+			</table>
+		</div>
 
 		<?php submit_button( __( 'Save Integrations', 'smartrecur' ), 'primary', 'smartrecur_integration_save' ); ?>
 	</form>

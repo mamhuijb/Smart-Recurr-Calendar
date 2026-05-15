@@ -41,6 +41,7 @@ final class SmartRecur_Autoloader {
 			'includes/helpers/',
 			'includes/traits/',
 			'includes/migration/',
+			'includes/admin/',
 		);
 
 		foreach ( $dirs as $dir ) {

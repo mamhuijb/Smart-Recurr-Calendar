@@ -36,8 +36,8 @@ final class SmartRecur_Plugin {
 	private function __construct() {
 		load_plugin_textdomain( 'smartrecur', false, dirname( SMARTRECUR_PLUGIN_BASENAME ) . '/languages' );
 
-		// Catch any uncaught Throwable in our REST callbacks so the React client
-		// never has to parse a WP "critical error" HTML page.
+		// Catch any uncaught Throwable in our REST callbacks so a fault returns
+		// clean JSON instead of WordPress's "critical error" HTML page.
 		SmartRecur_Error_Handler::register();
 
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
@@ -45,9 +45,9 @@ final class SmartRecur_Plugin {
 		add_action( 'admin_init', array( 'SmartRecur_Schema_Doctor', 'ensure' ) );
 		add_action( 'init', array( $this, 'register_shortcode' ) );
 		add_action( 'init', array( $this, 'maybe_upgrade_db' ) );
-		add_action( 'admin_menu', array( 'SmartRecur_Admin', 'register_menu' ) );
-		add_action( 'admin_enqueue_scripts', array( 'SmartRecur_Admin', 'enqueue_admin_assets' ) );
-		add_action( 'admin_notices', array( 'SmartRecur_Admin', 'maybe_welcome_notice' ) );
+
+		// Native WordPress admin: menu, list tables, edit screens.
+		SmartRecur_Admin_Pages::register();
 
 		// Self-updater (GitHub Releases → WP plugin update flow).
 		SmartRecur_Updater::register();
