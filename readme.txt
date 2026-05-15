@@ -82,6 +82,7 @@ Use **SmartRecur > Migration Tool** and provide the legacy DB credentials. Custo
 = 2026.05.3 =
 * New: WordPress dashboard widget showing upcoming SmartRecur appointments. Visible to anyone with the `smartrecur_view` capability; honours the per-user "Screen Options" hide/show.
 * New: SmartRecur → Settings → Dashboard Widget section to enable/disable the widget, cap the number of items shown, and set how many days ahead to scan.
+* Updater: switched from GitHub Releases API to a `release` branch model. The updater reads `smart-recurr-calendar.php` on the `release` branch to detect new versions and uses GitHub's auto-generated branch archive as the download. Releases now go out via a single `git push` to the release branch — no GitHub UI step.
 
 = 2026.05.2 =
 * Self-updater: plugin now checks GitHub Releases every 12 hours and surfaces new versions through the standard WordPress Plugins → Updates flow. "Check for updates" link added to the plugin row.
