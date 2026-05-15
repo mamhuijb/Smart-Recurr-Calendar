@@ -1,5 +1,0 @@
-{
-  "name": "SmartRecur Calendar",
-  "description": "A smart calendar application that uses AI to parse complex natural language recurrence rules (e.g., 'The second Tuesday of October') and manages automated reminder schedules.",
-  "requestFramePermissions": []
-}

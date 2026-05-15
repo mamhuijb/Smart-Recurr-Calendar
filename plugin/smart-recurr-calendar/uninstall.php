@@ -15,8 +15,13 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 
 $settings = get_option( 'smartrecur_settings', array() );
 if ( empty( $settings['deleteDataOnUninstall'] ) ) {
+	// Even when keeping data, drop scheduled events so they don't fire against
+	// a now-uninstalled plugin and trigger fatals.
+	wp_unschedule_hook( 'smartrecur_o365_sync_tick' );
 	return;
 }
+
+wp_unschedule_hook( 'smartrecur_o365_sync_tick' );
 
 global $wpdb;
 $prefix = $wpdb->prefix;

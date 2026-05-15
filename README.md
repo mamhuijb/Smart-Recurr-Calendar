@@ -1,104 +1,102 @@
 # SmartRecur Calendar
 
-Recurring appointment scheduler for MSPs with Office 365, Syncro MSP, Invoice Ninja, and Zoho integrations.
+WordPress plugin: recurring appointment scheduler for MSPs with Office 365, Syncro MSP, Invoice Ninja, and Zoho integrations.
 
-This repository now ships **two** flavors of SmartRecur:
+The compiled, installable plugin lives at [`plugin/smart-recurr-calendar/`](plugin/smart-recurr-calendar). The release tree at the root of the [`release` branch](https://github.com/mamhuijb/Smart-Recurr-Calendar/tree/release) is what end users download.
 
-| Layout                                | Purpose                                                              |
-|---------------------------------------|----------------------------------------------------------------------|
-| `plugin/smart-recurr-calendar/`       | **WordPress plugin** (current — recommended).                       |
-| Root files (`api/`, `database/`, …)   | Legacy standalone PHP + MariaDB app, kept for reference / migration. |
+## Install
 
----
+End users:
 
-## WordPress plugin
+1. WordPress → **Plugins → Add New → Upload Plugin**
+2. Upload the latest zip from the [Releases page](https://github.com/mamhuijb/Smart-Recurr-Calendar/releases) (or pull `https://github.com/mamhuijb/Smart-Recurr-Calendar/archive/refs/heads/release.zip` directly).
+3. Activate.
 
-### Requirements
+The plugin creates its own tables (`{prefix}smartrecur_*`), seeds defaults, and registers capabilities on activation. No manual setup needed.
 
-- WordPress 6.0+
-- PHP 8.4+
-- A WordPress 2FA plugin (WP 2FA, Two-Factor) if you need MFA — SmartRecur no longer reimplements TOTP.
+## Self-update
 
-### Install
+Plugin checks the GitHub `release` branch every 12 hours. New versions appear in the standard WordPress **Plugins → Updates** screen. Click "Update Now" — that's it.
 
-1. Copy `plugin/smart-recurr-calendar/` into `wp-content/plugins/`.
-2. Activate **SmartRecur Calendar** from the Plugins screen.
-3. (Optional) Define the Office 365 client secret in `wp-config.php`:
+To force an immediate check: **Plugins → SmartRecur Calendar row → "Check for updates"**.
 
-   ```php
-   define( 'SMARTRECUR_O365_CLIENT_SECRET', 'your-secret-here' );
-   ```
+## Capabilities
 
-4. Visit **SmartRecur > Integrations** to wire up Office 365, Syncro, Invoice Ninja, and Zoho.
-5. Add the calendar to any page either way:
+| Capability                  | Default roles                                   |
+|-----------------------------|-------------------------------------------------|
+| `smartrecur_manage`         | administrator                                   |
+| `smartrecur_book`           | administrator, editor                           |
+| `smartrecur_manage_clients` | administrator, editor                           |
+| `smartrecur_view`           | administrator, editor, subscriber               |
 
-   - Shortcode: `[smartrecur view="calendar"]`
-   - Elementor: drag the **SmartRecur Calendar** widget into your layout.
+## Office 365
 
-### Capabilities
+The plugin uses a multi-tenant Microsoft Graph app with PKCE so end users don't need to register their own Azure app. Site admins click **Connect to Office 365** in the Integrations screen, consent on Microsoft's page, then pick which calendar to sync. No client secret. No per-site Azure setup.
 
-| Capability                  | Granted to            | Allows                                          |
-|-----------------------------|-----------------------|-------------------------------------------------|
-| `smartrecur_manage`         | administrator         | Full admin (settings, integrations, all CRUD)   |
-| `smartrecur_book`           | administrator, editor | Create / edit / cancel appointments             |
-| `smartrecur_manage_clients` | administrator, editor | CRUD on clients                                 |
-| `smartrecur_view`           | administrator, editor, subscriber | Read-only calendar access           |
+Two-way sync runs automatically once connected:
 
-### REST endpoints
+- Every appointment created/updated/deleted in SmartRecur is pushed to Outlook in real time.
+- WP-Cron pulls changes from Outlook every 15 minutes and creates/updates SmartRecur appointments to match.
 
-All endpoints sit under the `smartrecur/v1` namespace and require a valid `X-WP-Nonce` + the matching capability:
+### One-time Azure app setup (plugin maintainer)
+
+The bundled flow needs ONE Azure app registration owned by the plugin author. This is configured once and then every site that installs the plugin uses it via PKCE (no client secret, no per-site setup).
+
+1. Sign in to https://portal.azure.com.
+2. **Microsoft Entra ID → App registrations → New registration**.
+3. Name: `SmartRecur Calendar`.
+4. **Supported account types**: *Accounts in any organizational directory and personal Microsoft accounts (multitenant)*.
+5. **Redirect URI**: leave empty for now (we add it programmatically per install) — but for testing, add one of type "Single-page application" pointing at `https://your-site.example/wp-json/smartrecur/v1/integrations/office365/callback`.
+6. Click **Register**.
+7. Copy the **Application (client) ID**.
+8. **Authentication → Platform configurations → Add a platform → Single-page application** (this enables PKCE without a client secret) and add `https://your-site.example/wp-json/smartrecur/v1/integrations/office365/callback`. Repeat for any additional install URLs, or use the wildcard subdomain pattern via "Web" platform if your customers all share a domain.
+9. **API permissions → Add → Microsoft Graph → Delegated**: `User.Read`, `Calendars.ReadWrite`, `Mail.Send`, `offline_access`. Click **Grant admin consent** for your tenant (each end-user tenant will consent themselves on first connect).
+
+Then in the plugin source, set the bundled client ID:
+
+```php
+// includes/integrations/class-smartrecur-office365.php → client_id()
+return 'YOUR-COPIED-APPLICATION-CLIENT-ID';
+```
+
+Or per-site (overrides the bundled value), define it in `wp-config.php`:
+
+```php
+define( 'SMARTRECUR_O365_CLIENT_ID', 'tenant-or-site-specific-client-id' );
+```
+
+## REST API
+
+Namespace: `smartrecur/v1`. Every endpoint requires `X-WP-Nonce` and the matching capability.
 
 - `GET|POST /appointments`, `GET|PUT|DELETE /appointments/{id}`, `POST /appointments/generate`
-- `GET|POST /clients` (`/customers` alias), `PUT|DELETE /clients/{id}`
+- `GET|POST /clients`, `PUT|DELETE /clients/{id}`
 - `GET|POST /services`, `PUT|DELETE /services/{id}`
 - `GET|POST /technicians`, `PUT|DELETE /technicians/{id}`
 - `GET|POST /recurring-rules`
 - `GET /calendar`
 - `GET|PUT /settings`, `GET /settings/backup`, `POST /settings/restore`
 - `GET /integrations/status`, `PUT /integrations/{type}/config`, `POST /integrations/{type}/test`
-- Office 365: `POST /integrations/office365/connect`, `GET /integrations/office365/callback`, `POST /integrations/office365/disconnect`, `POST /integrations/office365/sync`, `GET /integrations/office365/calendars`
-- Syncro MSP: `POST /integrations/syncro/import`, `POST /integrations/syncro/tickets`
+- Office 365: `POST /integrations/office365/connect`, `GET /integrations/office365/callback`, `POST /integrations/office365/disconnect`, `POST /integrations/office365/sync-now`, `GET /integrations/office365/calendars`, `POST /integrations/office365/select-calendar`
+- Syncro: `POST /integrations/syncro/import`, `POST /integrations/syncro/tickets`
 - Invoice Ninja: `POST /integrations/invoiceninja/import`
 - Email: `POST /integrations/email/send`, `GET /email-logs`
 
-### Building the React bundle
-
-The compiled assets ship inside the plugin (`assets/js/smartrecur-app.js`, `assets/css/smartrecur-app.css`) so the plugin works without running npm on the server. To rebuild:
+## Building from source
 
 ```bash
 cd plugin/smart-recurr-calendar
 npm install
-npm run build
+npm run build      # outputs assets/js/smartrecur-app.js + assets/css/smartrecur-app.css
 ```
 
-The output overwrites `assets/js/` and `assets/css/`. The React source lives in `plugin/smart-recurr-calendar/src/`.
+The compiled bundle is committed alongside the source so the plugin works without npm on the server.
 
-### Database tables
+## Repo layout
 
-Created on activation via `dbDelta()` with the configured `$wpdb->prefix`:
+- [`plugin/smart-recurr-calendar/`](plugin/smart-recurr-calendar) — the plugin (source + compiled assets).
+- [`release` branch](https://github.com/mamhuijb/Smart-Recurr-Calendar/tree/release) — same contents, flattened to the branch root, used by the auto-updater.
 
-`smartrecur_appointments`, `smartrecur_clients`, `smartrecur_assets`, `smartrecur_services`, `smartrecur_technicians`, `smartrecur_recurring_rules`, `smartrecur_email_logs`, `smartrecur_integration_configs`.
+## License
 
-Schema version is stored as the `smartrecur_db_version` option so future plugin upgrades can run incremental migrations.
-
-### Migrating from the standalone version
-
-Use **SmartRecur > Migration Tool** in the WP admin and provide the legacy database DSN. The migrator copies customers, services, technicians, and events into the prefixed WP tables. The old `users` table is ignored — WordPress handles users now.
-
-### Security at a glance
-
-- Every REST endpoint enforces `permission_callback` + `current_user_can()`. No `__return_true` on data endpoints.
-- WordPress nonces (`X-WP-Nonce`) are required for every state-changing call.
-- All queries use `$wpdb->prepare()`.
-- Integration secrets (Office 365 / Syncro / Invoice Ninja / Zoho tokens) are encrypted at rest with `AUTH_SALT`-derived keys via `sodium_crypto_secretbox` or AES-256-CBC + HMAC.
-- Integration responses never return secrets — only `••••••••` placeholders.
-- Outbound HTTP from integrations is SSRF-guarded (HTTPS-only, public-IP-only, plus host whitelists for Zoho/Syncro).
-- Rate limiting on booking endpoints via transients.
-
----
-
-## Legacy standalone application
-
-The original PHP + MariaDB app under the repository root remains in place. See the previous README revisions in git history for installation instructions if you want to run that version, or use the WordPress plugin's migration tool to bring its data forward.
-
-The standalone schema and source files are kept for reference and to seed the migration tool — they are not required at runtime once you're on the WordPress plugin.
+GPL-2.0-or-later.

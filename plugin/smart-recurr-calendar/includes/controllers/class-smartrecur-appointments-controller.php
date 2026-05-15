@@ -187,10 +187,13 @@ final class SmartRecur_Appointments_Controller extends WP_REST_Controller {
 			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d' )
 		);
 
-		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %s", $id ), ARRAY_A );
+		$row    = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %s", $id ), ARRAY_A );
+		$frontend = $this->to_frontend( $row );
 		$this->purge_caches();
 
-		return $this->with_no_store( rest_ensure_response( array( 'event' => $this->to_frontend( $row ) ) ), 201 );
+		do_action( 'smartrecur_appointment_saved', $id, $frontend );
+
+		return $this->with_no_store( rest_ensure_response( array( 'event' => $frontend ) ), 201 );
 	}
 
 	/**
@@ -233,6 +236,11 @@ final class SmartRecur_Appointments_Controller extends WP_REST_Controller {
 		);
 
 		$this->purge_caches();
+
+		$row      = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %s", $id ), ARRAY_A );
+		$frontend = $row ? $this->to_frontend( $row ) : array( 'id' => $id );
+		do_action( 'smartrecur_appointment_saved', $id, $frontend );
+
 		return $this->with_no_store( rest_ensure_response( array( 'success' => true ) ) );
 	}
 
@@ -246,6 +254,10 @@ final class SmartRecur_Appointments_Controller extends WP_REST_Controller {
 		global $wpdb;
 		$table = $wpdb->prefix . 'smartrecur_appointments';
 		$id    = sanitize_text_field( $request['id'] );
+
+		// Fire the hook before deleting so listeners can read o365_event_id etc.
+		do_action( 'smartrecur_appointment_deleted', $id );
+
 		$wpdb->delete( $table, array( 'id' => $id ), array( '%s' ) );
 		$this->purge_caches();
 		return $this->with_no_store( rest_ensure_response( array( 'success' => true ) ) );

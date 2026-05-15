@@ -4,7 +4,7 @@ Tags: calendar, appointments, scheduling, msp, recurring, office365, syncro
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.4
-Stable tag: 2026.05.3.2
+Stable tag: 2026.05.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,13 @@ Yes by default. Enable **Settings > Data Management > Delete data on uninstall**
 Use **SmartRecur > Migration Tool** and provide the legacy DB credentials. Customers, services, technicians, and events are copied over.
 
 == Changelog ==
+
+= 2026.05.4 =
+* New: Two-way Office 365 calendar sync. Appointments created in SmartRecur push to Outlook in real time; cron pulls Outlook changes every 15 minutes. Conflict resolution is "last write wins".
+* Office 365 OAuth switched to PKCE with a bundled multi-tenant Microsoft Graph app. Site admins click "Connect to Office 365" and consent — no per-site Azure app registration, no client secret to manage.
+* New REST endpoints: `POST /integrations/office365/sync-now`, `POST /integrations/office365/select-calendar`, `POST /integrations/office365/disconnect`.
+* `o365_event_id` column added to the appointments table (auto-applied by the schema doctor).
+* Repository cleanup: removed the legacy standalone PHP+React app from the repo root. The plugin is now the only thing here.
 
 = 2026.05.3.2 =
 * Critical fix: REST callbacks were returning null because `WP_REST_Response::set_status()` doesn't return $this. Every create endpoint (customers, services, technicians, appointments, recurring-rules) is fixed; this stops the "There has been a critical error on this website" page from showing when saving a customer or settings.
