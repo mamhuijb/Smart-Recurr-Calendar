@@ -582,32 +582,27 @@ final class SmartRecur_Admin_Pages {
 		$dates     = array();
 
 		if ( $recurring ) {
-			$dates = SmartRecur_Recurrence_Engine::generate(
-				array(
-					'frequency'    => $post['frequency'] ?? 'MONTHLY',
-					'pattern_type' => $post['pattern_type'] ?? 'ABSOLUTE',
-					'day_of_month' => $post['day_of_month'] ?? 1,
-					'ordinal'      => $post['ordinal'] ?? 1,
-					'weekday'      => $post['weekday'] ?? 1,
-					'start_month'  => $post['start_month'] ?? gmdate( 'n' ),
-					'start_year'   => $post['start_year'] ?? gmdate( 'Y' ),
-					'max_years'    => 5,
-				)
+			// Cast + clamp every recurrence input at intake; the engine clamps
+			// again defensively, but the source of truth is sanitised here.
+			$rule_config = array(
+				'frequency'    => in_array( $post['frequency'] ?? '', array( 'YEARLY', 'HALF_YEARLY', 'QUARTERLY', 'MONTHLY' ), true ) ? $post['frequency'] : 'MONTHLY',
+				'pattern_type' => ( ( $post['pattern_type'] ?? '' ) === 'RELATIVE' ) ? 'RELATIVE' : 'ABSOLUTE',
+				'day_of_month' => isset( $post['day_of_month'] ) ? max( 1, min( 31, absint( $post['day_of_month'] ) ) ) : 1,
+				'ordinal'      => isset( $post['ordinal'] ) ? (int) $post['ordinal'] : 1,
+				'weekday'      => isset( $post['weekday'] ) ? max( 0, min( 6, absint( $post['weekday'] ) ) ) : 1,
+				'start_month'  => isset( $post['start_month'] ) ? max( 1, min( 12, absint( $post['start_month'] ) ) ) : (int) gmdate( 'n' ),
+				'start_year'   => isset( $post['start_year'] ) ? max( 2020, min( 2100, absint( $post['start_year'] ) ) ) : (int) gmdate( 'Y' ),
+				'max_years'    => 5,
 			);
-			$rule = SmartRecur_Recurrence_Engine::describe(
-				array(
-					'frequency'    => $post['frequency'] ?? 'MONTHLY',
-					'pattern_type' => $post['pattern_type'] ?? 'ABSOLUTE',
-					'day_of_month' => $post['day_of_month'] ?? 1,
-					'ordinal'      => $post['ordinal'] ?? 1,
-					'weekday'      => $post['weekday'] ?? 1,
-					'start_month'  => $post['start_month'] ?? gmdate( 'n' ),
-				)
-			);
+			$dates = SmartRecur_Recurrence_Engine::generate( $rule_config );
+			$rule  = SmartRecur_Recurrence_Engine::describe( $rule_config );
 		} else {
 			$single = isset( $post['single_date'] ) ? sanitize_text_field( $post['single_date'] ) : '';
-			if ( $single ) {
-				$dates = array( gmdate( 'Y-m-d', strtotime( $single ) ) );
+			if ( $single && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $single ) ) {
+				$ts = strtotime( $single );
+				if ( $ts ) {
+					$dates = array( gmdate( 'Y-m-d', $ts ) );
+				}
 			}
 			$rule = __( 'One-time', 'smartrecur' );
 		}
@@ -739,7 +734,15 @@ final class SmartRecur_Admin_Pages {
 
 		// Bulk delete from WP_List_Table. The nonce action is `bulk-{plural}`,
 		// where {plural} is the page slug minus the `smartrecur-` prefix.
-		if ( isset( $_REQUEST['action'] ) && 'delete' === $_REQUEST['action'] && ! empty( $_REQUEST['ids'] ) ) {
+		// WP_List_Table renders two selects (`action` top, `action2` bottom).
+		$bulk = '';
+		if ( isset( $_REQUEST['action'] ) && '-1' !== $_REQUEST['action'] ) {
+			$bulk = sanitize_key( wp_unslash( $_REQUEST['action'] ) );
+		}
+		if ( ( '' === $bulk || 'delete' !== $bulk ) && isset( $_REQUEST['action2'] ) && '-1' !== $_REQUEST['action2'] ) {
+			$bulk = sanitize_key( wp_unslash( $_REQUEST['action2'] ) );
+		}
+		if ( 'delete' === $bulk && ! empty( $_REQUEST['ids'] ) ) {
 			$plural = str_replace( 'smartrecur-', '', $page );
 			check_admin_referer( 'bulk-' . $plural );
 			if ( ! current_user_can( $cap ) ) {
