@@ -1,244 +1,104 @@
-# SmartRecur Calendar v2.0
+# SmartRecur Calendar
 
 Recurring appointment scheduler for MSPs with Office 365, Syncro MSP, Invoice Ninja, and Zoho integrations.
 
-**Stack:** React 18 + TypeScript + Tailwind CSS (frontend) / PHP + MariaDB (backend)
+This repository now ships **two** flavors of SmartRecur:
+
+| Layout                                | Purpose                                                              |
+|---------------------------------------|----------------------------------------------------------------------|
+| `plugin/smart-recurr-calendar/`       | **WordPress plugin** (current — recommended).                       |
+| Root files (`api/`, `database/`, …)   | Legacy standalone PHP + MariaDB app, kept for reference / migration. |
 
 ---
 
-## Quick Start (Local Development)
+## WordPress plugin
 
-### Prerequisites
+### Requirements
 
-- **Node.js 18+** (for Vite dev server)
-- **PHP 8.1+** with extensions: `pdo_mysql`, `curl`, `mbstring`, `json`
-- **MariaDB 10.5+** (or MySQL 8+)
+- WordPress 6.0+
+- PHP 8.4+
+- A WordPress 2FA plugin (WP 2FA, Two-Factor) if you need MFA — SmartRecur no longer reimplements TOTP.
 
-### 1. Clone & install frontend dependencies
+### Install
+
+1. Copy `plugin/smart-recurr-calendar/` into `wp-content/plugins/`.
+2. Activate **SmartRecur Calendar** from the Plugins screen.
+3. (Optional) Define the Office 365 client secret in `wp-config.php`:
+
+   ```php
+   define( 'SMARTRECUR_O365_CLIENT_SECRET', 'your-secret-here' );
+   ```
+
+4. Visit **SmartRecur > Integrations** to wire up Office 365, Syncro, Invoice Ninja, and Zoho.
+5. Add the calendar to any page either way:
+
+   - Shortcode: `[smartrecur view="calendar"]`
+   - Elementor: drag the **SmartRecur Calendar** widget into your layout.
+
+### Capabilities
+
+| Capability                  | Granted to            | Allows                                          |
+|-----------------------------|-----------------------|-------------------------------------------------|
+| `smartrecur_manage`         | administrator         | Full admin (settings, integrations, all CRUD)   |
+| `smartrecur_book`           | administrator, editor | Create / edit / cancel appointments             |
+| `smartrecur_manage_clients` | administrator, editor | CRUD on clients                                 |
+| `smartrecur_view`           | administrator, editor, subscriber | Read-only calendar access           |
+
+### REST endpoints
+
+All endpoints sit under the `smartrecur/v1` namespace and require a valid `X-WP-Nonce` + the matching capability:
+
+- `GET|POST /appointments`, `GET|PUT|DELETE /appointments/{id}`, `POST /appointments/generate`
+- `GET|POST /clients` (`/customers` alias), `PUT|DELETE /clients/{id}`
+- `GET|POST /services`, `PUT|DELETE /services/{id}`
+- `GET|POST /technicians`, `PUT|DELETE /technicians/{id}`
+- `GET|POST /recurring-rules`
+- `GET /calendar`
+- `GET|PUT /settings`, `GET /settings/backup`, `POST /settings/restore`
+- `GET /integrations/status`, `PUT /integrations/{type}/config`, `POST /integrations/{type}/test`
+- Office 365: `POST /integrations/office365/connect`, `GET /integrations/office365/callback`, `POST /integrations/office365/disconnect`, `POST /integrations/office365/sync`, `GET /integrations/office365/calendars`
+- Syncro MSP: `POST /integrations/syncro/import`, `POST /integrations/syncro/tickets`
+- Invoice Ninja: `POST /integrations/invoiceninja/import`
+- Email: `POST /integrations/email/send`, `GET /email-logs`
+
+### Building the React bundle
+
+The compiled assets ship inside the plugin (`assets/js/smartrecur-app.js`, `assets/css/smartrecur-app.css`) so the plugin works without running npm on the server. To rebuild:
 
 ```bash
-git clone <repo-url> && cd Smart-Recurr-Calendar
+cd plugin/smart-recurr-calendar
 npm install
-```
-
-### 2. Create the database
-
-```bash
-mysql -u root -p < database/schema.sql
-```
-
-This creates the `smartrecur` database with all tables and a default admin user.
-
-### 3. Configure environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your database credentials:
-
-```
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=smartrecur
-DB_USER=smartrecur
-DB_PASS=your_db_password
-
-JWT_SECRET=generate_a_random_32_char_string_here
-```
-
-Generate a JWT secret:
-
-```bash
-openssl rand -hex 32
-```
-
-### 4. Start the PHP backend
-
-```bash
-php -S localhost:8000 -t . api/index.php
-```
-
-Or use the npm script:
-
-```bash
-npm run php
-```
-
-### 5. Start the Vite dev server (separate terminal)
-
-```bash
-npm run dev
-```
-
-The app is now running at **http://localhost:5173**.
-The Vite dev server proxies `/api/*` requests to the PHP backend on port 8000.
-
-### 6. Login
-
-- **Username:** `admin`
-- **Password:** `change_me_on_first_login`
-
-**Change this password immediately** in the database:
-
-```bash
-php -r "echo password_hash('your_new_password', PASSWORD_BCRYPT, ['cost' => 12]);"
-```
-
-Then update the user in MariaDB:
-
-```sql
-UPDATE users SET password_hash = '<output_from_above>' WHERE username = 'admin';
-```
-
----
-
-## Production Deployment (Plesk)
-
-### 1. Build the frontend
-
-```bash
 npm run build
 ```
 
-This outputs optimized files to `dist/`.
+The output overwrites `assets/js/` and `assets/css/`. The React source lives in `plugin/smart-recurr-calendar/src/`.
 
-### 2. Upload to Plesk
+### Database tables
 
-Upload the entire project to your domain's document root. The directory structure should be:
+Created on activation via `dbDelta()` with the configured `$wpdb->prefix`:
 
-```
-/httpdocs/
-├── .htaccess          (SPA routing + security headers)
-├── dist/              (built frontend)
-│   ├── index.html
-│   └── assets/
-├── api/               (PHP backend)
-│   ├── index.php
-│   ├── .htaccess
-│   ├── controllers/
-│   ├── helpers/
-│   ├── integrations/
-│   ├── middleware/
-│   └── config/
-├── database/
-│   └── schema.sql
-├── .env               (create from .env.example)
-└── .env.example
-```
+`smartrecur_appointments`, `smartrecur_clients`, `smartrecur_assets`, `smartrecur_services`, `smartrecur_technicians`, `smartrecur_recurring_rules`, `smartrecur_email_logs`, `smartrecur_integration_configs`.
 
-**Do NOT upload:** `node_modules/`, `src/`, `*.ts`, `*.tsx`, `package.json`, `.git/`
+Schema version is stored as the `smartrecur_db_version` option so future plugin upgrades can run incremental migrations.
 
-### 3. Create the database in Plesk
+### Migrating from the standalone version
 
-1. Go to **Databases** in Plesk
-2. Create a new database (e.g., `smartrecur`)
-3. Create a database user with full privileges
-4. Import the schema:
+Use **SmartRecur > Migration Tool** in the WP admin and provide the legacy database DSN. The migrator copies customers, services, technicians, and events into the prefixed WP tables. The old `users` table is ignored — WordPress handles users now.
 
-```bash
-mysql -u smartrecur -p smartrecur < database/schema.sql
-```
+### Security at a glance
 
-### 4. Configure .env
-
-Create `.env` in the document root (next to `.htaccess`):
-
-```
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=smartrecur
-DB_USER=your_plesk_db_user
-DB_PASS=your_plesk_db_password
-
-JWT_SECRET=<random 64 char string>
-JWT_EXPIRY=86400
-
-CORS_ORIGIN=https://your-domain.com
-
-O365_CLIENT_ID=
-O365_CLIENT_SECRET=
-O365_TENANT_ID=common
-O365_REDIRECT_URI=https://your-domain.com/api/integrations/office365/callback
-```
-
-### 5. Verify PHP extensions
-
-In Plesk > PHP Settings, make sure these extensions are enabled:
-- `pdo_mysql`
-- `curl`
-- `mbstring`
-- `json`
-
-### 6. Set permissions
-
-```bash
-chmod 600 .env
-chmod -R 755 api/
-```
-
-### 7. Test
-
-Visit `https://your-domain.com` — you should see the login screen.
+- Every REST endpoint enforces `permission_callback` + `current_user_can()`. No `__return_true` on data endpoints.
+- WordPress nonces (`X-WP-Nonce`) are required for every state-changing call.
+- All queries use `$wpdb->prepare()`.
+- Integration secrets (Office 365 / Syncro / Invoice Ninja / Zoho tokens) are encrypted at rest with `AUTH_SALT`-derived keys via `sodium_crypto_secretbox` or AES-256-CBC + HMAC.
+- Integration responses never return secrets — only `••••••••` placeholders.
+- Outbound HTTP from integrations is SSRF-guarded (HTTPS-only, public-IP-only, plus host whitelists for Zoho/Syncro).
+- Rate limiting on booking endpoints via transients.
 
 ---
 
-## Integrations Setup
+## Legacy standalone application
 
-### Office 365
+The original PHP + MariaDB app under the repository root remains in place. See the previous README revisions in git history for installation instructions if you want to run that version, or use the WordPress plugin's migration tool to bring its data forward.
 
-1. Register an app at [Azure Portal](https://portal.azure.com) > App Registrations
-2. Set redirect URI to: `https://your-domain.com/api/integrations/office365/callback`
-3. Add permissions: `User.Read`, `Calendars.ReadWrite`
-4. Copy Client ID and Tenant ID into Admin > Office 365
-5. Add Client Secret to `.env` as `O365_CLIENT_SECRET`
-6. Click "Connect" in the admin panel
-
-### Syncro MSP
-
-1. Get your API key from Syncro MSP Admin > API Tokens
-2. Enter API Key and Subdomain in Admin > Syncro MSP
-3. Click "Test" to verify, then "Import Customers" to sync
-
-### Invoice Ninja
-
-1. Get your API key from Invoice Ninja > Settings > Account Management
-2. Enter the endpoint URL and API key in Admin > InvoiceNinja
-3. Click "Test Connection"
-
-### Zoho CRM/Books
-
-1. Generate an OAuth access token from Zoho API Console
-2. Enter the token and endpoint in Admin > Zoho
-3. Click "Test Connection"
-
----
-
-## Default Login
-
-| Username | Password |
-|----------|----------|
-| `admin` | `change_me_on_first_login` |
-
-**Change this immediately after first login.**
-
----
-
-## Architecture
-
-```
-Frontend (React SPA)
-    ↓ JWT Bearer token
-PHP API (api/index.php router)
-    ↓ PDO prepared statements
-MariaDB
-    ↓
-Integration proxies → Office 365, Syncro, Invoice Ninja, Zoho
-```
-
-- All API keys stored server-side in `integration_configs` table (never sent to browser)
-- JWT authentication with bcrypt password hashing
-- Server-side TOTP 2FA verification
-- CORS restricted to configured origin
-- Rate limiting on login (5 attempts / 5 min)
-- SSRF protection on integration endpoints
+The standalone schema and source files are kept for reference and to seed the migration tool — they are not required at runtime once you're on the WordPress plugin.

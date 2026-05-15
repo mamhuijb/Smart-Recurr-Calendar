@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+plugin/smart-recurr-calendar/node_modules/
 
 # Deployment artifacts
 smartrecur-deploy.tar.gz
