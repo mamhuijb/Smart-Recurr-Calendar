@@ -26,10 +26,22 @@ $syncro        = $integrations['syncro']['config'] ?? array();
 $invoiceninja  = $integrations['invoiceninja']['config'] ?? array();
 $zoho          = $integrations['zoho']['config'] ?? array();
 ?>
-<div class="wrap smartrecur-admin">
-	<h1><?php esc_html_e( 'SmartRecur Integrations', 'smartrecur' ); ?></h1>
+<?php
+$sr_theme = ( ( ( (array) get_option( 'smartrecur_settings', array() ) )['branding']['themeMode'] ?? 'dark' ) === 'light' ) ? ' smartrecur-theme-light' : '';
+?>
+<div class="wrap smartrecur-admin<?php echo esc_attr( $sr_theme ); ?>">
 
-	<div class="smartrecur-card">
+	<div class="sr-appbar">
+		<div class="sr-appbar-brand">
+			<div class="sr-appbar-logo"><span class="dashicons dashicons-networking"></span></div>
+			<div>
+				<div class="sr-appbar-title"><?php esc_html_e( 'Integrations', 'smartrecur' ); ?></div>
+				<div class="sr-appbar-sub">SmartRecur</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="sr-card">
 		<h2><?php esc_html_e( 'Office 365 Calendar', 'smartrecur' ); ?></h2>
 
 		<?php if ( ! $o365_ready ) : ?>
@@ -40,7 +52,7 @@ $zoho          = $integrations['zoho']['config'] ?? array();
 			</div>
 		<?php elseif ( ! empty( $o365['isConnected'] ) ) : ?>
 			<p>
-				<span class="smartrecur-badge smartrecur-badge-ok"><?php esc_html_e( 'Connected', 'smartrecur' ); ?></span>
+				<span class="sr-badge sr-badge-ok"><?php esc_html_e( 'Connected', 'smartrecur' ); ?></span>
 				<?php echo esc_html( $o365_email ); ?>
 			</p>
 			<table class="form-table" role="presentation">
@@ -74,7 +86,7 @@ $zoho          = $integrations['zoho']['config'] ?? array();
 				</tr>
 			</table>
 		<?php else : ?>
-			<p><span class="smartrecur-badge smartrecur-badge-off"><?php esc_html_e( 'Not connected', 'smartrecur' ); ?></span></p>
+			<p><span class="sr-badge sr-badge-off"><?php esc_html_e( 'Not connected', 'smartrecur' ); ?></span></p>
 			<p><button type="button" class="button button-primary" id="sr-o365-connect"><?php esc_html_e( 'Connect to Office 365', 'smartrecur' ); ?></button></p>
 			<p class="description"><?php esc_html_e( 'Opens a Microsoft sign-in window. After you consent, pick a calendar and two-way sync starts automatically.', 'smartrecur' ); ?></p>
 		<?php endif; ?>
@@ -83,7 +95,7 @@ $zoho          = $integrations['zoho']['config'] ?? array();
 	<form method="post">
 		<?php wp_nonce_field( 'smartrecur_integrations' ); ?>
 
-		<div class="smartrecur-card">
+		<div class="sr-card">
 			<h2><?php esc_html_e( 'Syncro MSP', 'smartrecur' ); ?></h2>
 			<table class="form-table" role="presentation">
 				<tr>
@@ -97,7 +109,7 @@ $zoho          = $integrations['zoho']['config'] ?? array();
 			</table>
 		</div>
 
-		<div class="smartrecur-card">
+		<div class="sr-card">
 			<h2><?php esc_html_e( 'Invoice Ninja', 'smartrecur' ); ?></h2>
 			<table class="form-table" role="presentation">
 				<tr>
@@ -111,7 +123,7 @@ $zoho          = $integrations['zoho']['config'] ?? array();
 			</table>
 		</div>
 
-		<div class="smartrecur-card">
+		<div class="sr-card">
 			<h2><?php esc_html_e( 'Zoho', 'smartrecur' ); ?></h2>
 			<table class="form-table" role="presentation">
 				<tr>

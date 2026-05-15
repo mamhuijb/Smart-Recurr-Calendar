@@ -30,11 +30,24 @@ $days_of_week = array(
 	6 => __( 'Saturday', 'smartrecur' ),
 );
 ?>
-<div class="wrap smartrecur-admin">
-	<h1><?php esc_html_e( 'SmartRecur Settings', 'smartrecur' ); ?></h1>
+<?php
+$sr_theme = ( ( $branding['themeMode'] ?? 'dark' ) === 'light' ) ? ' smartrecur-theme-light' : '';
+?>
+<div class="wrap smartrecur-admin<?php echo esc_attr( $sr_theme ); ?>">
+
+	<div class="sr-appbar">
+		<div class="sr-appbar-brand">
+			<div class="sr-appbar-logo"><span class="dashicons dashicons-admin-generic"></span></div>
+			<div>
+				<div class="sr-appbar-title"><?php esc_html_e( 'Settings', 'smartrecur' ); ?></div>
+				<div class="sr-appbar-sub">SmartRecur</div>
+			</div>
+		</div>
+	</div>
 
 	<form method="post">
 		<?php wp_nonce_field( 'smartrecur_settings' ); ?>
+		<div class="sr-card">
 
 		<h2><?php esc_html_e( 'Branding', 'smartrecur' ); ?></h2>
 		<table class="form-table" role="presentation">
@@ -208,5 +221,6 @@ $days_of_week = array(
 		</table>
 
 		<?php submit_button( __( 'Save Settings', 'smartrecur' ), 'primary', 'smartrecur_settings_save' ); ?>
+		</div>
 	</form>
 </div>

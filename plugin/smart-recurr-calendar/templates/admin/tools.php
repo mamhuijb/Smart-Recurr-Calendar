@@ -13,9 +13,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /** @var array|null $result */
 ?>
-<div class="wrap smartrecur-admin">
-	<h1><?php esc_html_e( 'SmartRecur Tools', 'smartrecur' ); ?></h1>
+<?php
+$sr_theme = ( ( ( (array) get_option( 'smartrecur_settings', array() ) )['branding']['themeMode'] ?? 'dark' ) === 'light' ) ? ' smartrecur-theme-light' : '';
+?>
+<div class="wrap smartrecur-admin<?php echo esc_attr( $sr_theme ); ?>">
 
+	<div class="sr-appbar">
+		<div class="sr-appbar-brand">
+			<div class="sr-appbar-logo"><span class="dashicons dashicons-admin-tools"></span></div>
+			<div>
+				<div class="sr-appbar-title"><?php esc_html_e( 'Tools', 'smartrecur' ); ?></div>
+				<div class="sr-appbar-sub">SmartRecur</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="sr-card">
 	<h2><?php esc_html_e( 'Import from standalone SmartRecur', 'smartrecur' ); ?></h2>
 	<p class="description">
 		<?php esc_html_e( 'Pull clients, services, technicians and appointments from a legacy standalone SmartRecur MariaDB database into this WordPress install. One-time tool.', 'smartrecur' ); ?>
@@ -58,8 +71,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<?php submit_button( __( 'Run migration', 'smartrecur' ), 'primary', 'smartrecur_migration_run' ); ?>
 	</form>
 
-	<hr>
+	</div>
 
+	<div class="sr-card">
 	<h2><?php esc_html_e( 'Backup', 'smartrecur' ); ?></h2>
 	<p class="description">
 		<?php
@@ -70,4 +84,5 @@ if ( ! defined( 'ABSPATH' ) ) {
 		);
 		?>
 	</p>
+	</div>
 </div>

@@ -4,7 +4,7 @@ Tags: calendar, appointments, scheduling, msp, recurring, office365, syncro
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.4
-Stable tag: 2026.06.1
+Stable tag: 2026.06.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,11 @@ Yes by default. Enable **Settings > Data Management > Delete data on uninstall**
 Use **SmartRecur > Migration Tool** and provide the legacy DB credentials. Customers, services, technicians, and events are copied over.
 
 == Changelog ==
+
+= 2026.06.2 =
+* Modern UI: the native admin and the [smartrecur] shortcode now use a dark, card-based theme matching the original SmartRecur app design — app header bar, calendar dashboard with an Upcoming side panel, rounded day cells with a highlighted "today", and modern form cards. Still 100% server-rendered PHP.
+* Calendar dashboard shows the next 90 days of appointments in an Upcoming panel and marks closed days (weekends / holidays / manual closures) with a lock icon.
+* Light/dark palette follows the Branding → Theme setting.
 
 = 2026.06.1 =
 * Full rebuild as a native WordPress plugin. The React single-page app is gone — every screen is now server-rendered PHP using standard WordPress patterns (WP_List_Table, admin forms with nonces, the settings layout).

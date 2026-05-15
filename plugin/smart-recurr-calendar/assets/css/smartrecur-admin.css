@@ -1,157 +1,666 @@
 /**
- * SmartRecur native admin styles.
+ * SmartRecur — modern admin & front-end theme.
  *
- * Built to sit naturally inside wp-admin — uses WordPress greys, the standard
- * card pattern, and the admin colour scheme. Works in light and dark admin.
+ * Dark, card-based UI that matches the original SmartRecur app design while
+ * staying 100% server-rendered. Scoped under .smartrecur-admin so it never
+ * leaks into the rest of wp-admin. A .smartrecur-theme-light modifier flips
+ * the palette for light mode.
  */
 
-/* Cards ------------------------------------------------------------------ */
-.smartrecur-admin .smartrecur-card {
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 4px 20px 16px;
-	margin: 16px 0;
-	max-width: 880px;
+/* ====================================================================
+ * Design tokens.
+ * ================================================================== */
+.smartrecur-admin {
+	--sr-bg:          #0a0e1a;
+	--sr-surface:     #111726;
+	--sr-surface-2:   #18203360;
+	--sr-raised:      #1a2236;
+	--sr-border:      #232c44;
+	--sr-border-soft: #1b2235;
+	--sr-text:        #e7ecf3;
+	--sr-text-soft:   #9aa6bd;
+	--sr-text-muted:  #5d6880;
+	--sr-primary:     #6366f1;
+	--sr-primary-600: #4f46e5;
+	--sr-primary-700: #4338ca;
+	--sr-on-primary:  #ffffff;
+	--sr-ok:          #10b981;
+	--sr-warn:        #f59e0b;
+	--sr-danger:      #ef4444;
+	--sr-radius:      14px;
+	--sr-radius-sm:   9px;
+	--sr-shadow:      0 8px 30px rgba(0,0,0,.35);
 }
-.smartrecur-admin .smartrecur-card h2 {
-	margin-top: 14px;
+.smartrecur-admin.smartrecur-theme-light {
+	--sr-bg:          #f1f5f9;
+	--sr-surface:     #ffffff;
+	--sr-surface-2:   #f8fafc;
+	--sr-raised:      #f1f5f9;
+	--sr-border:      #e2e8f0;
+	--sr-border-soft: #eef2f7;
+	--sr-text:        #0f172a;
+	--sr-text-soft:   #475569;
+	--sr-text-muted:  #94a3b8;
+	--sr-shadow:      0 8px 30px rgba(15,23,42,.08);
 }
 
-/* Status badges + dots --------------------------------------------------- */
-.smartrecur-badge {
-	display: inline-block;
-	padding: 2px 8px;
-	border-radius: 3px;
-	font-size: 11px;
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: .03em;
-	vertical-align: middle;
-	margin-right: 6px;
+/* ====================================================================
+ * Darken the wp-admin content column on SmartRecur screens.
+ * ================================================================== */
+body[class*="page_smartrecur"] #wpcontent,
+body[class*="page_smartrecur"] #wpbody-content,
+body.toplevel_page_smartrecur #wpcontent,
+body.toplevel_page_smartrecur #wpbody-content {
+	background: #0a0e1a;
 }
-.smartrecur-badge-ok  { background: #d5f5e3; color: #126e3a; }
-.smartrecur-badge-off { background: #fdeaea; color: #a02b2b; }
-
-.smartrecur-color-dot {
-	display: inline-block;
-	width: 10px;
-	height: 10px;
-	border-radius: 50%;
-	margin-right: 8px;
-	vertical-align: middle;
+body[class*="page_smartrecur"] #wpfooter {
+	color: #5d6880;
 }
 
-.smartrecur-status {
-	display: inline-block;
-	padding: 2px 8px;
-	border-radius: 3px;
-	font-size: 11px;
-	font-weight: 600;
+/* ====================================================================
+ * Base layout.
+ * ================================================================== */
+.smartrecur-admin.wrap,
+.smartrecur-admin {
+	margin: 0;
+	padding: 24px 24px 48px;
+	background: var(--sr-bg);
+	color: var(--sr-text);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	min-height: calc(100vh - 32px);
+	box-sizing: border-box;
 }
-.smartrecur-status-scheduled { background: #e7f0fb; color: #1d4ed8; }
-.smartrecur-status-completed { background: #d5f5e3; color: #126e3a; }
-.smartrecur-status-missed    { background: #fdeaea; color: #a02b2b; }
+.smartrecur-admin * { box-sizing: border-box; }
+.smartrecur-admin a { color: var(--sr-primary); }
 
-/* Calendar grid ---------------------------------------------------------- */
-.smartrecur-calendar-nav {
-	margin: 12px 0;
+/* App header bar -------------------------------------------------- */
+.sr-appbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 22px;
+}
+.sr-appbar-brand {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+.sr-appbar-logo {
+	width: 40px;
+	height: 40px;
+	border-radius: 11px;
+	background: linear-gradient(135deg, var(--sr-primary), var(--sr-primary-700));
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+	font-size: 19px;
+	box-shadow: 0 6px 16px rgba(99,102,241,.35);
+}
+.sr-appbar-title {
+	font-size: 17px;
+	font-weight: 700;
+	line-height: 1.15;
+	letter-spacing: -.01em;
+}
+.sr-appbar-sub {
+	font-size: 12px;
+	color: var(--sr-text-muted);
+}
+.sr-appbar-actions {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 }
-.smartrecur-calendar-label {
-	font-size: 16px;
-	font-weight: 600;
-	margin-left: 8px;
+
+/* ====================================================================
+ * Cards.
+ * ================================================================== */
+.sr-card {
+	background: var(--sr-surface);
+	border: 1px solid var(--sr-border);
+	border-radius: var(--sr-radius);
+	padding: 20px 22px;
+	margin: 0 0 20px;
 }
-table.smartrecur-calendar-grid {
-	table-layout: fixed;
-	width: 100%;
-	border-collapse: collapse;
-	background: #fff;
-}
-table.smartrecur-calendar-grid th {
-	text-align: center;
-	padding: 8px 4px;
-	background: #f6f7f7;
-	border: 1px solid #dcdcde;
-	font-size: 12px;
-	text-transform: uppercase;
-	letter-spacing: .04em;
-}
-table.smartrecur-calendar-grid td {
-	border: 1px solid #dcdcde;
-	vertical-align: top;
-	height: 104px;
-	padding: 4px;
-	width: 14.28%;
-}
-.smartrecur-cal-empty {
-	background: #fafafa;
-}
-.smartrecur-cal-day.is-today {
-	background: #fff8e5;
-}
-.smartrecur-cal-daynum {
-	font-size: 12px;
-	font-weight: 600;
-	text-align: right;
-	margin-bottom: 2px;
-}
-.smartrecur-cal-daynum a {
-	text-decoration: none;
-}
-.smartrecur-cal-events {
+.sr-card-pad-0 { padding: 0; }
+.sr-card h2,
+.sr-card-title {
+	margin: 0 0 16px;
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--sr-text);
 	display: flex;
-	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+}
+.sr-card-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 18px;
+}
+.sr-card-head h2,
+.sr-card-head .sr-card-title { margin: 0; }
+
+/* Dashboard 2-column layout --------------------------------------- */
+.sr-dash {
+	display: grid;
+	grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+	gap: 20px;
+	align-items: start;
+}
+@media (max-width: 1100px) {
+	.sr-dash { grid-template-columns: 1fr; }
+}
+
+/* ====================================================================
+ * Buttons.
+ * ================================================================== */
+.smartrecur-admin .sr-btn,
+.smartrecur-admin a.sr-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 8px 15px;
+	border-radius: var(--sr-radius-sm);
+	border: 1px solid var(--sr-border);
+	background: var(--sr-raised);
+	color: var(--sr-text);
+	font-size: 13px;
+	font-weight: 600;
+	text-decoration: none;
+	cursor: pointer;
+	transition: background .15s ease, border-color .15s ease, transform .05s ease;
+	line-height: 1.4;
+}
+.smartrecur-admin .sr-btn:hover { background: var(--sr-border); }
+.smartrecur-admin .sr-btn:active { transform: scale(.98); }
+.smartrecur-admin .sr-btn-primary {
+	background: linear-gradient(135deg, var(--sr-primary), var(--sr-primary-600));
+	border-color: transparent;
+	color: var(--sr-on-primary);
+	box-shadow: 0 4px 14px rgba(99,102,241,.3);
+}
+.smartrecur-admin .sr-btn-primary:hover { background: linear-gradient(135deg, var(--sr-primary-600), var(--sr-primary-700)); }
+.smartrecur-admin .sr-btn-danger { color: var(--sr-danger); }
+.smartrecur-admin .sr-btn-icon {
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	justify-content: center;
+}
+.smartrecur-admin .sr-btn-sm { padding: 5px 10px; font-size: 12px; }
+
+/* Segmented control ------------------------------------------------ */
+.sr-segment {
+	display: inline-flex;
+	padding: 3px;
+	background: var(--sr-raised);
+	border: 1px solid var(--sr-border);
+	border-radius: var(--sr-radius-sm);
 	gap: 2px;
 }
-.smartrecur-cal-event {
+.sr-segment a {
+	padding: 6px 13px;
+	border-radius: 7px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--sr-text-soft);
+	text-decoration: none;
+}
+.sr-segment a.is-active {
+	background: var(--sr-primary);
+	color: #fff;
+}
+
+/* Pills / badges --------------------------------------------------- */
+.sr-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 4px 10px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	background: var(--sr-raised);
+	border: 1px solid var(--sr-border);
+	color: var(--sr-text-soft);
+}
+.sr-badge {
+	display: inline-block;
+	padding: 2px 9px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 700;
+}
+.sr-badge-ok     { background: rgba(16,185,129,.15); color: #34d399; }
+.sr-badge-off    { background: rgba(239,68,68,.15);  color: #f87171; }
+.sr-badge-count  { background: var(--sr-primary); color: #fff; }
+.sr-badge-scheduled { background: rgba(99,102,241,.18); color: #a5b4fc; }
+.sr-badge-completed { background: rgba(16,185,129,.15); color: #34d399; }
+.sr-badge-missed    { background: rgba(239,68,68,.15);  color: #f87171; }
+
+/* ====================================================================
+ * Calendar.
+ * ================================================================== */
+.sr-cal-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 14px;
+	margin-bottom: 18px;
+	flex-wrap: wrap;
+}
+.sr-cal-month {
+	font-size: 22px;
+	font-weight: 800;
+	letter-spacing: -.02em;
+}
+.sr-cal-head-left,
+.sr-cal-head-right {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.sr-cal-grid {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 8px;
+	table-layout: fixed;
+}
+.sr-cal-grid th {
+	padding: 0 6px 6px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .08em;
+	color: var(--sr-text-muted);
+	text-align: left;
+	text-transform: uppercase;
+}
+.sr-cal-grid td {
+	height: 116px;
+	vertical-align: top;
+	padding: 0;
+}
+.sr-cal-cell {
+	height: 100%;
+	border: 1px solid var(--sr-border-soft);
+	border-radius: var(--sr-radius-sm);
+	padding: 8px;
+	background: var(--sr-surface-2);
+	transition: border-color .15s ease, background .15s ease;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+a.sr-cal-cell:hover {
+	border-color: var(--sr-primary);
+	background: var(--sr-raised);
+	text-decoration: none;
+}
+.sr-cal-cell.is-empty {
+	border-style: dashed;
+	opacity: .35;
+	background: transparent;
+}
+.sr-cal-cell.is-closed {
+	opacity: .45;
+}
+.sr-cal-daynum {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--sr-text-soft);
+}
+.sr-cal-cell.is-today .sr-cal-daynum-badge {
+	background: var(--sr-primary);
+	color: #fff;
+	width: 26px;
+	height: 26px;
+	border-radius: 8px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 4px 12px rgba(99,102,241,.4);
+}
+.sr-cal-daynum-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 22px;
+	height: 22px;
+}
+.sr-cal-lock { color: var(--sr-text-muted); font-size: 11px; }
+.sr-cal-events { display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.sr-cal-event {
 	display: block;
 	font-size: 11px;
-	line-height: 1.3;
-	padding: 2px 5px;
-	background: #f0f0f1;
-	border-left: 3px solid #4f46e5;
-	border-radius: 2px;
+	line-height: 1.35;
+	padding: 3px 7px;
+	border-radius: 6px;
+	background: var(--sr-raised);
+	border-left: 3px solid var(--sr-primary);
+	color: var(--sr-text);
 	text-decoration: none;
-	color: #1d2327;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.smartrecur-cal-event:hover {
-	background: #e8e8ea;
+.sr-cal-event:hover { background: var(--sr-border); }
+.sr-cal-event.is-completed { opacity: .55; }
+.sr-cal-event.is-missed    { text-decoration: line-through; opacity: .7; }
+.sr-cal-event-time { font-weight: 700; margin-right: 4px; color: var(--sr-text-soft); }
+
+/* Upcoming list ---------------------------------------------------- */
+.sr-upcoming-list { display: flex; flex-direction: column; gap: 8px; }
+.sr-upcoming-item {
+	display: flex;
+	gap: 10px;
+	padding: 11px 12px;
+	background: var(--sr-surface-2);
+	border: 1px solid var(--sr-border-soft);
+	border-radius: var(--sr-radius-sm);
+	text-decoration: none;
+	color: var(--sr-text);
 }
-.smartrecur-cal-event.smartrecur-status-completed { opacity: .6; }
-.smartrecur-cal-event.smartrecur-status-missed    { text-decoration: line-through; }
-.smartrecur-cal-time {
+.sr-upcoming-item:hover { border-color: var(--sr-primary); }
+.sr-upcoming-dot {
+	width: 8px;
+	flex: 0 0 8px;
+	border-radius: 999px;
+	margin-top: 4px;
+}
+.sr-upcoming-body { min-width: 0; flex: 1; }
+.sr-upcoming-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-upcoming-meta { font-size: 11px; color: var(--sr-text-muted); margin-top: 2px; }
+
+/* Empty state ------------------------------------------------------ */
+.sr-empty {
+	text-align: center;
+	padding: 40px 20px;
+	color: var(--sr-text-muted);
+}
+.sr-empty-icon { font-size: 30px; opacity: .4; margin-bottom: 8px; }
+.sr-empty-title { font-size: 14px; font-weight: 600; color: var(--sr-text-soft); }
+.sr-empty-sub { font-size: 12px; margin-top: 3px; }
+
+/* ====================================================================
+ * Forms.
+ * ================================================================== */
+.smartrecur-admin .sr-form { max-width: 720px; }
+.smartrecur-admin .sr-field { margin-bottom: 18px; }
+.smartrecur-admin .sr-field > label {
+	display: block;
+	font-size: 12px;
 	font-weight: 600;
-	margin-right: 3px;
+	color: var(--sr-text-soft);
+	margin-bottom: 6px;
+}
+.smartrecur-admin .sr-field .sr-req { color: var(--sr-primary); }
+.smartrecur-admin .sr-form input[type="text"],
+.smartrecur-admin .sr-form input[type="email"],
+.smartrecur-admin .sr-form input[type="url"],
+.smartrecur-admin .sr-form input[type="number"],
+.smartrecur-admin .sr-form input[type="password"],
+.smartrecur-admin .sr-form input[type="time"],
+.smartrecur-admin .sr-form input[type="date"],
+.smartrecur-admin .sr-form select,
+.smartrecur-admin .sr-form textarea {
+	width: 100%;
+	max-width: 460px;
+	background: var(--sr-surface-2);
+	border: 1px solid var(--sr-border);
+	border-radius: var(--sr-radius-sm);
+	color: var(--sr-text);
+	padding: 9px 12px;
+	font-size: 13px;
+	line-height: 1.5;
+}
+.smartrecur-admin .sr-form input:focus,
+.smartrecur-admin .sr-form select:focus,
+.smartrecur-admin .sr-form textarea:focus {
+	outline: none;
+	border-color: var(--sr-primary);
+	box-shadow: 0 0 0 3px rgba(99,102,241,.25);
+}
+.smartrecur-admin .sr-form input[type="color"] {
+	width: 48px;
+	height: 36px;
+	padding: 2px;
+	background: var(--sr-surface-2);
+	border: 1px solid var(--sr-border);
+	border-radius: var(--sr-radius-sm);
+}
+.smartrecur-admin .sr-form .description,
+.smartrecur-admin .sr-help {
+	font-size: 11px;
+	color: var(--sr-text-muted);
+	margin-top: 5px;
+}
+.smartrecur-admin .sr-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.smartrecur-admin .sr-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 13px;
+	color: var(--sr-text);
+	margin-right: 16px;
+}
+.smartrecur-admin .sr-form-actions {
+	margin-top: 22px;
+	padding-top: 18px;
+	border-top: 1px solid var(--sr-border);
+	display: flex;
+	gap: 10px;
 }
 
-/* Forms ------------------------------------------------------------------ */
-.smartrecur-admin .smartrecur-form h2 {
-	margin-top: 24px;
-	padding-bottom: 6px;
-	border-bottom: 1px solid #dcdcde;
+/* WordPress form-table, reskinned (used by settings / integrations / tools) -- */
+.smartrecur-admin .form-table {
+	margin: 0;
 }
-.smartrecur-admin .smartrecur-sched-block {
-	max-width: 880px;
+.smartrecur-admin .form-table th {
+	color: var(--sr-text-soft);
+	font-size: 12px;
+	font-weight: 600;
+	padding: 14px 16px 14px 0;
+	vertical-align: top;
+}
+.smartrecur-admin .form-table td {
+	padding: 12px 0;
+	color: var(--sr-text);
+}
+.smartrecur-admin .form-table input[type="text"],
+.smartrecur-admin .form-table input[type="email"],
+.smartrecur-admin .form-table input[type="url"],
+.smartrecur-admin .form-table input[type="number"],
+.smartrecur-admin .form-table input[type="password"],
+.smartrecur-admin .form-table input[type="time"],
+.smartrecur-admin .form-table input[type="date"],
+.smartrecur-admin .form-table select,
+.smartrecur-admin .form-table textarea,
+.smartrecur-admin input.regular-text,
+.smartrecur-admin input.large-text,
+.smartrecur-admin textarea.large-text {
+	background: var(--sr-surface-2);
+	border: 1px solid var(--sr-border);
+	border-radius: var(--sr-radius-sm);
+	color: var(--sr-text);
+	padding: 8px 11px;
+	font-size: 13px;
+}
+.smartrecur-admin .form-table input:focus,
+.smartrecur-admin .form-table select:focus,
+.smartrecur-admin .form-table textarea:focus {
+	outline: none;
+	border-color: var(--sr-primary);
+	box-shadow: 0 0 0 3px rgba(99,102,241,.25);
+}
+.smartrecur-admin .form-table input[type="color"] {
+	background: var(--sr-surface-2);
+	border: 1px solid var(--sr-border);
+	border-radius: var(--sr-radius-sm);
+	width: 48px;
+	height: 36px;
+}
+.smartrecur-admin .form-table .description,
+.smartrecur-admin p.description {
+	color: var(--sr-text-muted);
+	font-size: 11px;
+}
+.smartrecur-admin .form-table h2,
+.smartrecur-admin .sr-card h2 + .form-table {
+	color: var(--sr-text);
+}
+.smartrecur-admin h2 {
+	color: var(--sr-text);
+	font-size: 15px;
+	font-weight: 700;
+}
+.smartrecur-admin .submit .button-primary,
+.smartrecur-admin p.submit input[type="submit"] {
+	background: linear-gradient(135deg, var(--sr-primary), var(--sr-primary-600));
+	border: 0;
+	border-radius: var(--sr-radius-sm);
+	box-shadow: 0 4px 14px rgba(99,102,241,.3);
+	padding: 8px 18px;
+	height: auto;
+}
+.smartrecur-admin .button,
+.smartrecur-admin .button-secondary {
+	background: var(--sr-raised);
+	border: 1px solid var(--sr-border);
+	color: var(--sr-text);
+	border-radius: var(--sr-radius-sm);
+}
+.smartrecur-admin .button:hover {
+	background: var(--sr-border);
+	color: var(--sr-text);
+	border-color: var(--sr-border);
+}
+.smartrecur-admin code {
+	background: var(--sr-surface-2);
+	color: var(--sr-text-soft);
+	border-radius: 4px;
 }
 
-/* Front-end shortcode wrapper -------------------------------------------- */
+/* ====================================================================
+ * WP_List_Table dark skin.
+ * ================================================================== */
+.smartrecur-admin .wp-list-table {
+	background: var(--sr-surface);
+	border: 1px solid var(--sr-border);
+	border-radius: var(--sr-radius);
+	border-collapse: separate;
+	border-spacing: 0;
+	overflow: hidden;
+}
+.smartrecur-admin .wp-list-table thead th,
+.smartrecur-admin .wp-list-table thead td {
+	background: var(--sr-surface-2);
+	color: var(--sr-text-soft);
+	border-bottom: 1px solid var(--sr-border);
+	font-size: 12px;
+}
+.smartrecur-admin .wp-list-table tbody td,
+.smartrecur-admin .wp-list-table tbody th {
+	background: transparent;
+	color: var(--sr-text);
+	border-bottom: 1px solid var(--sr-border-soft);
+}
+.smartrecur-admin .wp-list-table tbody tr:hover td,
+.smartrecur-admin .wp-list-table tbody tr:hover th {
+	background: var(--sr-surface-2);
+}
+.smartrecur-admin .wp-list-table a { color: var(--sr-text); text-decoration: none; }
+.smartrecur-admin .wp-list-table a:hover { color: var(--sr-primary); }
+.smartrecur-admin .wp-list-table .row-actions { color: var(--sr-text-muted); }
+.smartrecur-admin .tablenav,
+.smartrecur-admin .tablenav .tablenav-pages a,
+.smartrecur-admin .tablenav .tablenav-pages span {
+	color: var(--sr-text-soft);
+}
+.smartrecur-admin .search-box input[type="search"] {
+	background: var(--sr-surface-2);
+	border: 1px solid var(--sr-border);
+	border-radius: var(--sr-radius-sm);
+	color: var(--sr-text);
+	padding: 6px 10px;
+}
+.smartrecur-admin .wp-list-table .check-column input { margin: 0; }
+.smartrecur-admin .smartrecur-color-dot {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 999px;
+	margin-right: 8px;
+	vertical-align: middle;
+}
+.smartrecur-admin .smartrecur-status {
+	display: inline-block;
+	padding: 2px 9px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 700;
+}
+.smartrecur-admin .smartrecur-status-scheduled { background: rgba(99,102,241,.18); color: #a5b4fc; }
+.smartrecur-admin .smartrecur-status-completed { background: rgba(16,185,129,.15); color: #34d399; }
+.smartrecur-admin .smartrecur-status-missed    { background: rgba(239,68,68,.15);  color: #f87171; }
+
+/* ====================================================================
+ * Page heading + WordPress notices inside our screens.
+ * ================================================================== */
+.smartrecur-admin .wp-heading-inline {
+	color: var(--sr-text);
+	font-size: 21px;
+	font-weight: 800;
+}
+.smartrecur-admin .page-title-action {
+	background: linear-gradient(135deg, var(--sr-primary), var(--sr-primary-600));
+	border-color: transparent;
+	color: #fff;
+	border-radius: var(--sr-radius-sm);
+	box-shadow: 0 4px 14px rgba(99,102,241,.3);
+}
+.smartrecur-admin .wp-header-end { border: 0; margin: 14px 0; }
+.smartrecur-admin .notice {
+	background: var(--sr-surface);
+	border: 1px solid var(--sr-border);
+	border-left-width: 4px;
+	color: var(--sr-text);
+	border-radius: var(--sr-radius-sm);
+}
+.smartrecur-admin .notice-success { border-left-color: var(--sr-ok); }
+.smartrecur-admin .notice-error   { border-left-color: var(--sr-danger); }
+.smartrecur-admin .notice-warning { border-left-color: var(--sr-warn); }
+
+/* ====================================================================
+ * Front-end shortcode.
+ * ================================================================== */
 .smartrecur-frontend {
-	max-width: 1100px;
+	max-width: 1180px;
 	margin: 0 auto;
 }
-.smartrecur-frontend table.smartrecur-calendar-grid td {
-	height: 88px;
+.smartrecur-frontend.smartrecur-admin {
+	min-height: 0;
+	border-radius: var(--sr-radius);
 }
 .smartrecur-login-required {
-	padding: 16px;
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
-	background: #f6f7f7;
+	padding: 18px 20px;
+	border: 1px solid var(--sr-border);
+	border-radius: var(--sr-radius);
+	background: var(--sr-surface);
+	color: var(--sr-text);
+}
+
+/* Responsive ------------------------------------------------------- */
+@media (max-width: 782px) {
+	.sr-cal-grid td { height: 84px; }
+	.sr-cal-month { font-size: 18px; }
+	.smartrecur-admin.wrap { padding: 16px 12px 40px; }
 }
