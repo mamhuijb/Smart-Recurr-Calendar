@@ -4,7 +4,7 @@ Tags: calendar, appointments, scheduling, msp, recurring, office365, syncro
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.4
-Stable tag: 2026.05.1
+Stable tag: 2026.05.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,11 @@ Yes by default. Enable **Settings > Data Management > Delete data on uninstall**
 Use **SmartRecur > Migration Tool** and provide the legacy DB credentials. Customers, services, technicians, and events are copied over.
 
 == Changelog ==
+
+= 2026.05.2 =
+* Self-updater: plugin now checks GitHub Releases every 12 hours and surfaces new versions through the standard WordPress Plugins → Updates flow. "Check for updates" link added to the plugin row.
+* Dashboard: neutral grey container background that holds up on light and dark WordPress admin themes.
+* Versioning convention: feature releases bump the third segment (2026.05.2), patch releases add a fourth (2026.05.2.1).
 
 = 2026.05.1 =
 * First public WordPress plugin release.
