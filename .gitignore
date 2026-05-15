@@ -31,3 +31,4 @@ smartrecur-deploy.b64
 *.njsproj
 *.sln
 *.sw?
+plugin/*.zip

@@ -41,6 +41,7 @@ final class SmartRecur_Plugin {
 		add_action( 'init', array( $this, 'maybe_upgrade_db' ) );
 		add_action( 'admin_menu', array( 'SmartRecur_Admin', 'register_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( 'SmartRecur_Admin', 'enqueue_admin_assets' ) );
+		add_action( 'admin_notices', array( 'SmartRecur_Admin', 'maybe_welcome_notice' ) );
 
 		if ( did_action( 'elementor/loaded' ) || defined( 'ELEMENTOR_VERSION' ) ) {
 			add_action( 'elementor/widgets/register', array( $this, 'register_elementor_widget' ) );

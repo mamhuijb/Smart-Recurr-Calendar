@@ -22,6 +22,8 @@ final class SmartRecur_Activator {
 		flush_rewrite_rules();
 		update_option( 'smartrecur_db_version', SMARTRECUR_DB_VERSION );
 		update_option( 'smartrecur_plugin_version', SMARTRECUR_VERSION );
+		// Trigger a one-time post-activation notice via transient.
+		set_transient( 'smartrecur_just_activated', 1, 60 );
 	}
 
 	/**
