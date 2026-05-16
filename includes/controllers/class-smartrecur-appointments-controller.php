@@ -80,11 +80,6 @@ final class SmartRecur_Appointments_Controller extends WP_REST_Controller {
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => array( $this, 'generate' ),
 				'permission_callback' => $this->require_cap( 'smartrecur_book' ),
-				'args'                => array(
-					'ruleText'  => array( 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
-					'startDate' => array( 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
-					'maxYears'  => array( 'sanitize_callback' => 'absint' ),
-				),
 			)
 		);
 	}
@@ -264,33 +259,36 @@ final class SmartRecur_Appointments_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * POST /appointments/generate — produce dates from a recurrence rule without saving.
+	 * POST /appointments/generate — preview the occurrence dates for a structured
+	 * recurrence rule, without saving. Powers the live preview in the booking form.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response
 	 */
 	public function generate( $request ) {
-		$rule_text  = (string) $request['ruleText'];
-		$start_date = (string) $request['startDate'];
-		$max_years  = max( 1, min( 10, (int) ( $request['maxYears'] ?? 5 ) ) );
+		$config = array(
+			'frequency'    => in_array( $request['frequency'], array( 'YEARLY', 'HALF_YEARLY', 'QUARTERLY', 'MONTHLY' ), true ) ? $request['frequency'] : 'MONTHLY',
+			'pattern_type' => ( 'RELATIVE' === $request['patternType'] ) ? 'RELATIVE' : 'ABSOLUTE',
+			'day_of_month' => absint( $request['dayOfMonth'] ?? 1 ),
+			'ordinal'      => (int) ( $request['ordinal'] ?? 1 ),
+			'weekday'      => absint( $request['weekday'] ?? 1 ),
+			'start_month'  => absint( $request['startMonth'] ?? gmdate( 'n' ) ),
+			'start_year'   => absint( $request['startYear'] ?? gmdate( 'Y' ) ),
+			'max_years'    => 5,
+		);
 
-		$start_ts = strtotime( $start_date );
-		if ( ! $start_ts ) {
-			return new WP_Error( 'smartrecur_invalid_date', __( 'Invalid start date.', 'smartrecur' ), array( 'status' => 400 ) );
-		}
+		$dates = SmartRecur_Recurrence_Engine::generate( $config );
+		$rule  = SmartRecur_Recurrence_Engine::describe( $config );
 
-		$end_ts = strtotime( '+' . $max_years . ' years', $start_ts );
-		$dates  = array();
-		$cursor = $start_ts;
-
-		// Fallback engine: dates are generated client-side from the structured rule;
-		// this endpoint just returns the start date when no parser is wired up server-side.
-		while ( $cursor <= $end_ts ) {
-			$dates[] = gmdate( 'Y-m-d', $cursor );
-			$cursor  = strtotime( '+1 year', $cursor );
-		}
-
-		return $this->with_no_store( rest_ensure_response( array( 'dates' => $dates ) ) );
+		return $this->with_no_store(
+			rest_ensure_response(
+				array(
+					'dates' => $dates,
+					'rule'  => $rule,
+					'count' => count( $dates ),
+				)
+			)
+		);
 	}
 
 	/**

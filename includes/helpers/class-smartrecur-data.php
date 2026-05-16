@@ -313,7 +313,8 @@ final class SmartRecur_Data {
 		} else {
 			$fields['id']         = $id;
 			$fields['created_by'] = get_current_user_id();
-			$wpdb->insert( $table, $fields, array_merge( $formats, array( '%s', '%d' ) ) );
+			$fields['view_token'] = bin2hex( random_bytes( 16 ) );
+			$wpdb->insert( $table, $fields, array_merge( $formats, array( '%s', '%d', '%s' ) ) );
 		}
 
 		$row = self::get_appointment( $id );

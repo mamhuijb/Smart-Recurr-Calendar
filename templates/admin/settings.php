@@ -70,6 +70,47 @@ $sr_theme = ( ( $branding['themeMode'] ?? 'dark' ) === 'light' ) ? ' smartrecur-
 			</tr>
 		</table>
 
+		<h2><?php esc_html_e( 'Appearance', 'smartrecur' ); ?></h2>
+		<p class="description"><?php esc_html_e( 'Recolour the calendar UI and reminder emails. Defaults match the SmartRecur dark theme.', 'smartrecur' ); ?></p>
+		<?php $pal = isset( $palette ) && is_array( $palette ) ? $palette : SmartRecur_Theme::palette(); ?>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th><?php esc_html_e( 'UI mode', 'smartrecur' ); ?></th>
+				<td>
+					<select name="appearance_mode">
+						<option value="dark" <?php selected( $pal['mode'], 'dark' ); ?>><?php esc_html_e( 'Dark', 'smartrecur' ); ?></option>
+						<option value="light" <?php selected( $pal['mode'], 'light' ); ?>><?php esc_html_e( 'Light', 'smartrecur' ); ?></option>
+					</select>
+				</td>
+			</tr>
+			<tr>
+				<th><?php esc_html_e( 'Primary color', 'smartrecur' ); ?></th>
+				<td>
+					<input type="color" name="appearance_primary" value="<?php echo esc_attr( $pal['primary'] ); ?>">
+					<input type="color" name="appearance_primary600" value="<?php echo esc_attr( $pal['primary600'] ); ?>">
+					<span class="description"><?php esc_html_e( 'Accent + hover shade.', 'smartrecur' ); ?></span>
+				</td>
+			</tr>
+			<tr>
+				<th><?php esc_html_e( 'Calendar surface', 'smartrecur' ); ?></th>
+				<td>
+					<input type="color" name="appearance_bg" value="<?php echo esc_attr( $pal['bg'] ); ?>">
+					<input type="color" name="appearance_surface" value="<?php echo esc_attr( $pal['surface'] ); ?>">
+					<input type="color" name="appearance_border" value="<?php echo esc_attr( $pal['border'] ); ?>">
+					<input type="color" name="appearance_text" value="<?php echo esc_attr( $pal['text'] ); ?>">
+					<span class="description"><?php esc_html_e( 'Background · card · border · text.', 'smartrecur' ); ?></span>
+				</td>
+			</tr>
+			<tr>
+				<th><?php esc_html_e( 'Email colors', 'smartrecur' ); ?></th>
+				<td>
+					<input type="color" name="appearance_email_header" value="<?php echo esc_attr( $pal['emailHeader'] ); ?>">
+					<input type="color" name="appearance_email_accent" value="<?php echo esc_attr( $pal['emailAccent'] ); ?>">
+					<span class="description"><?php esc_html_e( 'Reminder email header bar · button.', 'smartrecur' ); ?></span>
+				</td>
+			</tr>
+		</table>
+
 		<h2><?php esc_html_e( 'Business Hours', 'smartrecur' ); ?></h2>
 		<table class="form-table" role="presentation">
 			<tr>
@@ -182,6 +223,17 @@ $sr_theme = ( ( $branding['themeMode'] ?? 'dark' ) === 'light' ) ? ' smartrecur-
 				<td>
 					<textarea id="sr-tpl-body" name="template_body" class="large-text" rows="6"><?php echo esc_textarea( $tpl_body ); ?></textarea>
 					<p class="description"><?php esc_html_e( 'Tokens: {customer_name}, {service_name}, {tech_name}, {date}, {location_type}, {company_name}, {link}', 'smartrecur' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th><?php esc_html_e( 'Send test email', 'smartrecur' ); ?></th>
+				<td>
+					<input type="email" name="test_email" placeholder="you@example.com" value="<?php echo esc_attr( wp_get_current_user()->user_email ); ?>">
+					<button type="submit" name="smartrecur_send_test" value="1" class="button">
+						<span class="dashicons dashicons-email" style="vertical-align:middle;"></span>
+						<?php esc_html_e( 'Send test', 'smartrecur' ); ?>
+					</button>
+					<p class="description"><?php esc_html_e( 'Sends the reminder email with sample data so you can review the layout. The result appears under Email Logs.', 'smartrecur' ); ?></p>
 				</td>
 			</tr>
 		</table>

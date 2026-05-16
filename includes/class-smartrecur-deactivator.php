@@ -32,6 +32,9 @@ final class SmartRecur_Deactivator {
 		if ( class_exists( 'SmartRecur_Sync_Office365' ) ) {
 			SmartRecur_Sync_Office365::unschedule();
 		}
+		if ( class_exists( 'SmartRecur_Reminders' ) ) {
+			SmartRecur_Reminders::unschedule();
+		}
 
 		flush_rewrite_rules();
 	}

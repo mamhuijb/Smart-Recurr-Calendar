@@ -137,6 +137,7 @@ final class SmartRecur_Activator {
 			end_time varchar(5) DEFAULT NULL,
 			status varchar(20) NOT NULL DEFAULT 'SCHEDULED',
 			o365_event_id longtext DEFAULT NULL,
+			view_token varchar(64) DEFAULT NULL,
 			created_by bigint(20) UNSIGNED DEFAULT NULL,
 			modified_by bigint(20) UNSIGNED DEFAULT NULL,
 			created_at timestamp DEFAULT CURRENT_TIMESTAMP,

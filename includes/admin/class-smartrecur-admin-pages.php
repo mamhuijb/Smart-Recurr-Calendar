@@ -46,6 +46,7 @@ final class SmartRecur_Admin_Pages {
 			'smartrecur-technicians'  => array( __( 'Technicians', 'smartrecur' ),  'smartrecur_manage',         'render_technicians' ),
 			'smartrecur-integrations' => array( __( 'Integrations', 'smartrecur' ), 'smartrecur_manage',         'render_integrations' ),
 			'smartrecur-settings'     => array( __( 'Settings', 'smartrecur' ),     'smartrecur_manage',         'render_settings' ),
+			'smartrecur-logs'         => array( __( 'Email Logs', 'smartrecur' ),   'smartrecur_manage',         'render_logs' ),
 			'smartrecur-tools'        => array( __( 'Tools', 'smartrecur' ),        'smartrecur_manage',         'render_tools' ),
 		);
 
@@ -69,6 +70,8 @@ final class SmartRecur_Admin_Pages {
 			array(),
 			SMARTRECUR_VERSION
 		);
+		// Appearance-settings palette override.
+		wp_add_inline_style( 'smartrecur-admin', SmartRecur_Theme::inline_css() );
 		wp_enqueue_script(
 			'smartrecur-admin',
 			SMARTRECUR_PLUGIN_URL . 'assets/js/smartrecur-admin.js',
@@ -686,10 +689,40 @@ final class SmartRecur_Admin_Pages {
 		if ( ! empty( $_POST['smartrecur_settings_save'] ) ) {
 			check_admin_referer( 'smartrecur_settings' );
 			SmartRecur_Settings::save_form( wp_unslash( $_POST ) );
+			SmartRecur_Theme::save_form( wp_unslash( $_POST ) );
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'smartrecur' ) . '</p></div>';
 		}
+
+		// Send-test-email action (separate submit button on the Notifications card).
+		if ( ! empty( $_POST['smartrecur_send_test'] ) ) {
+			check_admin_referer( 'smartrecur_settings' );
+			$test_to = isset( $_POST['test_email'] ) ? sanitize_email( wp_unslash( $_POST['test_email'] ) ) : '';
+			if ( $test_to && is_email( $test_to ) ) {
+				$sent = SmartRecur_Mailer::send_test( $test_to );
+				$cls  = $sent ? 'success' : 'error';
+				$msg  = $sent
+					? sprintf( /* translators: %s email */ __( 'Test email sent to %s.', 'smartrecur' ), $test_to )
+					: __( 'Test email failed — check the Email Logs and your SMTP plugin.', 'smartrecur' );
+				echo '<div class="notice notice-' . esc_attr( $cls ) . ' is-dismissible"><p>' . esc_html( $msg ) . '</p></div>';
+			} else {
+				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Enter a valid recipient email for the test.', 'smartrecur' ) . '</p></div>';
+			}
+		}
+
 		$settings = (array) get_option( 'smartrecur_settings', array() );
+		$palette  = SmartRecur_Theme::palette();
 		include SMARTRECUR_PLUGIN_DIR . 'templates/admin/settings.php';
+	}
+
+	/**
+	 * Render the email logs screen.
+	 */
+	public static function render_logs() {
+		if ( ! current_user_can( 'smartrecur_manage' ) ) {
+			wp_die( esc_html__( 'You cannot view the email logs.', 'smartrecur' ) );
+		}
+		$logs = SmartRecur_Mailer::recent_logs( 200 );
+		include SMARTRECUR_PLUGIN_DIR . 'templates/admin/logs.php';
 	}
 
 	/**

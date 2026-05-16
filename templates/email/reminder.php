@@ -1,9 +1,9 @@
 <?php
 /**
- * HTML reminder email template.
+ * HTML reminder email — recoloured by the Appearance settings.
  *
- * Variables expected: $customer_name, $service_name, $tech_name, $date,
- * $location_type, $company_name, $link.
+ * Expects $smartrecur_email: subject, body, company, logo, header_color,
+ * accent_color, link, link_label.
  *
  * @package SmartRecur
  */
@@ -12,27 +12,42 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/** @var string $customer_name, $service_name, $tech_name, $date, $location_type, $company_name, $link */
+/** @var array $smartrecur_email */
+$e      = isset( $smartrecur_email ) && is_array( $smartrecur_email ) ? $smartrecur_email : array();
+$header = $e['header_color'] ?? '#4f46e5';
+$accent = $e['accent_color'] ?? '#6366f1';
 ?>
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"></head>
-<body style="font-family: Arial, sans-serif; color: #1f2937; background: #f9fafb; padding: 24px;">
-	<div style="max-width: 560px; margin: 0 auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
-		<div style="background: #4f46e5; color: #fff; padding: 20px 24px;">
-			<h1 style="margin: 0; font-size: 18px;"><?php echo esc_html( $company_name ?? 'SmartRecur' ); ?></h1>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:24px;background:#f1f5f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">
+	<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgba(15,23,42,.10);">
+		<div style="background:<?php echo esc_attr( $header ); ?>;padding:22px 26px;color:#ffffff;">
+			<?php if ( ! empty( $e['logo'] ) ) : ?>
+				<img src="<?php echo esc_url( $e['logo'] ); ?>" alt="" style="max-height:34px;display:block;">
+			<?php else : ?>
+				<div style="font-size:18px;font-weight:700;"><?php echo esc_html( $e['company'] ?? 'SmartRecur' ); ?></div>
+			<?php endif; ?>
 		</div>
-		<div style="padding: 24px;">
-			<p>Hi <?php echo esc_html( $customer_name ?? '' ); ?>,</p>
-			<p>This is a reminder that we have scheduled a <strong><?php echo esc_html( $service_name ?? '' ); ?></strong> appointment for you on <strong><?php echo esc_html( $date ?? '' ); ?></strong>.</p>
-			<p>Technician: <?php echo esc_html( $tech_name ?? 'TBD' ); ?><br>
-			   Location: <?php echo esc_html( $location_type ?? '' ); ?></p>
-			<?php if ( ! empty( $link ) ) : ?>
-				<p style="margin: 24px 0;">
-					<a href="<?php echo esc_url( $link ); ?>" style="display: inline-block; background: #4f46e5; color: #fff; padding: 10px 16px; border-radius: 8px; text-decoration: none;">Confirm or reschedule</a>
+		<div style="padding:26px;">
+			<?php
+			// The body is admin-authored plain text with {tokens} already resolved.
+			$lines = explode( "\n", (string) ( $e['body'] ?? '' ) );
+			foreach ( $lines as $line ) {
+				echo '<p style="margin:0 0 12px;font-size:14px;line-height:1.6;">' . esc_html( $line ) . '</p>';
+			}
+			?>
+			<?php if ( ! empty( $e['link'] ) ) : ?>
+				<p style="margin:24px 0 8px;">
+					<a href="<?php echo esc_url( $e['link'] ); ?>"
+						style="display:inline-block;background:<?php echo esc_attr( $accent ); ?>;color:#ffffff;padding:11px 20px;border-radius:9px;text-decoration:none;font-weight:600;font-size:14px;">
+						<?php echo esc_html( $e['link_label'] ?? 'View appointment' ); ?>
+					</a>
 				</p>
 			<?php endif; ?>
-			<p style="margin-top: 32px; color: #6b7280; font-size: 13px;">Met vriendelijke groet,<br><?php echo esc_html( $company_name ?? '' ); ?></p>
+		</div>
+		<div style="padding:16px 26px;border-top:1px solid #eef2f7;color:#94a3b8;font-size:12px;">
+			<?php echo esc_html( $e['company'] ?? '' ); ?>
 		</div>
 	</div>
 </body>

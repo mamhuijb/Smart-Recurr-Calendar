@@ -215,6 +215,19 @@ body[class*="page_smartrecur"] #wpfooter {
 	background: var(--sr-primary);
 	color: #fff;
 }
+.sr-seg-opt {
+	padding: 7px 12px;
+	border-radius: 7px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--sr-text-soft);
+	cursor: pointer;
+	user-select: none;
+}
+.sr-seg-opt.is-active {
+	background: var(--sr-primary);
+	color: #fff;
+}
 
 /* Pills / badges --------------------------------------------------- */
 .sr-pill {

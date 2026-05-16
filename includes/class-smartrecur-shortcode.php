@@ -70,6 +70,7 @@ final class SmartRecur_Shortcode {
 		}
 
 		wp_enqueue_style( 'smartrecur-admin' );
+		wp_add_inline_style( 'smartrecur-admin', SmartRecur_Theme::inline_css() );
 		nocache_headers();
 
 		$base_url = get_permalink();
