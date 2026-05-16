@@ -38,7 +38,7 @@
 	}
 
 	/* -----------------------------------------------------------------
-	 * Appointment recurrence builder.
+	 * Appointment recurrence builder + live preview.
 	 * --------------------------------------------------------------- */
 	function initRecurrenceBuilder() {
 		var form = document.getElementById( 'smartrecur-appointment-form' );
@@ -50,16 +50,24 @@
 		var recurring = document.getElementById( 'sr-recurring-fields' );
 		var absRows   = form.querySelectorAll( '.sr-pattern-absolute' );
 		var relRows   = form.querySelectorAll( '.sr-pattern-relative' );
+		var prevList  = document.getElementById( 'sr-preview-list' );
+		var prevCount = document.getElementById( 'sr-preview-count' );
+		var prevRule  = document.getElementById( 'sr-preview-rule' );
+		var debounce  = null;
+
+		// Reflect the checked radio in each segmented control via an is-active class.
+		function paintSegments() {
+			form.querySelectorAll( '.sr-seg-opt' ).forEach( function ( opt ) {
+				var input = opt.querySelector( 'input[type="radio"]' );
+				opt.classList.toggle( 'is-active', !! ( input && input.checked ) );
+			} );
+		}
 
 		function syncScheduleType() {
-			var isRecurring = form.querySelector( 'input[name="is_recurring"]:checked' );
-			var recurringOn = isRecurring && '1' === isRecurring.value;
-			if ( oneTime ) {
-				oneTime.style.display = recurringOn ? 'none' : '';
-			}
-			if ( recurring ) {
-				recurring.style.display = recurringOn ? '' : 'none';
-			}
+			var rec = form.querySelector( 'input[name="is_recurring"]:checked' );
+			var on  = rec && '1' === rec.value;
+			if ( oneTime ) { oneTime.style.display = on ? 'none' : ''; }
+			if ( recurring ) { recurring.style.display = on ? '' : 'none'; }
 		}
 
 		function syncPattern() {
@@ -69,15 +77,66 @@
 			relRows.forEach( function ( r ) { r.style.display = isRel ? '' : 'none'; } );
 		}
 
+		function fieldVal( name ) {
+			var el = form.querySelector( '[name="' + name + '"]' );
+			return el ? el.value : '';
+		}
+
+		function refreshPreview() {
+			if ( ! prevList ) { return; }
+			var rec = form.querySelector( 'input[name="is_recurring"]:checked' );
+			if ( ! rec || '1' !== rec.value ) { return; }
+			var pattern = form.querySelector( 'input[name="pattern_type"]:checked' );
+
+			prevList.innerHTML = '<div class="sr-empty-sub" style="padding:8px;">…</div>';
+			rest( 'POST', 'appointments/generate', {
+				frequency:   fieldVal( 'frequency' ),
+				patternType: pattern ? pattern.value : 'RELATIVE',
+				dayOfMonth:  fieldVal( 'day_of_month' ),
+				ordinal:     fieldVal( 'ordinal' ),
+				weekday:     fieldVal( 'weekday' ),
+				startMonth:  fieldVal( 'start_month' ),
+				startYear:   fieldVal( 'start_year' )
+			} ).then( function ( data ) {
+				var dates = ( data && data.dates ) || [];
+				prevList.innerHTML = '';
+				dates.slice( 0, 8 ).forEach( function ( d ) {
+					var row = document.createElement( 'div' );
+					row.className = 'sr-upcoming-item';
+					row.innerHTML = '<span class="sr-upcoming-dot" style="background:var(--sr-primary)"></span>'
+						+ '<span class="sr-upcoming-body"><span class="sr-upcoming-title">' + d + '</span></span>';
+					prevList.appendChild( row );
+				} );
+				if ( ! dates.length ) {
+					prevList.innerHTML = '<div class="sr-empty-sub" style="padding:8px;">No dates</div>';
+				}
+				if ( prevCount ) { prevCount.textContent = String( ( data && data.count ) || 0 ); }
+				if ( prevRule ) { prevRule.textContent = ( data && data.rule ) || ''; }
+			} ).catch( function () {
+				prevList.innerHTML = '<div class="sr-empty-sub" style="padding:8px;">Preview unavailable</div>';
+			} );
+		}
+
+		function queuePreview() {
+			clearTimeout( debounce );
+			debounce = setTimeout( refreshPreview, 250 );
+		}
+
 		form.querySelectorAll( 'input[name="is_recurring"]' ).forEach( function ( el ) {
-			el.addEventListener( 'change', syncScheduleType );
+			el.addEventListener( 'change', function () { paintSegments(); syncScheduleType(); queuePreview(); } );
 		} );
 		form.querySelectorAll( 'input[name="pattern_type"]' ).forEach( function ( el ) {
-			el.addEventListener( 'change', syncPattern );
+			el.addEventListener( 'change', function () { paintSegments(); syncPattern(); queuePreview(); } );
+		} );
+		[ 'frequency', 'day_of_month', 'ordinal', 'weekday', 'start_month' ].forEach( function ( name ) {
+			var el = form.querySelector( '[name="' + name + '"]' );
+			if ( el ) { el.addEventListener( 'change', queuePreview ); }
 		} );
 
+		paintSegments();
 		syncScheduleType();
 		syncPattern();
+		refreshPreview();
 	}
 
 	/* -----------------------------------------------------------------

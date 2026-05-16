@@ -4,7 +4,7 @@ Tags: calendar, appointments, scheduling, msp, recurring, office365, syncro
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.4
-Stable tag: 2026.06.2
+Stable tag: 2026.06.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,14 @@ Yes by default. Enable **Settings > Data Management > Delete data on uninstall**
 Use **SmartRecur > Migration Tool** and provide the legacy DB credentials. Customers, services, technicians, and events are copied over.
 
 == Changelog ==
+
+= 2026.06.3 =
+* Booking form rebuilt as a two-column layout with a live "Schedule Builder" — the recurrence preview updates as you change the rule, showing the next occurrences and the human-readable description before you save.
+* Reminder emails now carry a private "View appointment" link. Each appointment gets a per-appointment token; the link opens a clean read-only page (no login) showing the date, time, service, technician, location and status.
+* New "Email Logs" admin screen lists every sent / failed reminder and test email.
+* Settings → Notifications gains a "Send test email" button so you can preview the reminder layout; the result is recorded in Email Logs.
+* New "Appearance" settings section: colour pickers for the calendar UI (primary, surfaces, text) and the reminder email (header bar, button). Defaults match the SmartRecur dark theme.
+* Reminder emails are now scheduled — a daily WP-Cron job sends them at the configured intervals (per-service overrides honoured) via wp_mail().
 
 = 2026.06.2 =
 * Modern UI: the native admin and the [smartrecur] shortcode now use a dark, card-based theme matching the original SmartRecur app design — app header bar, calendar dashboard with an Upcoming side panel, rounded day cells with a highlighted "today", and modern form cards. Still 100% server-rendered PHP.

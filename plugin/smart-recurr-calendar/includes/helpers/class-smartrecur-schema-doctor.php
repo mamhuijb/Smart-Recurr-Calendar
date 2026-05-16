@@ -53,6 +53,7 @@ final class SmartRecur_Schema_Doctor {
 				'start_time'    => "ADD COLUMN start_time varchar(5) DEFAULT NULL",
 				'end_time'      => "ADD COLUMN end_time varchar(5) DEFAULT NULL",
 				'o365_event_id' => "ADD COLUMN o365_event_id longtext DEFAULT NULL",
+				'view_token'    => "ADD COLUMN view_token varchar(64) DEFAULT NULL",
 			)
 		);
 
