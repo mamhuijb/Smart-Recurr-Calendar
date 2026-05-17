@@ -4,7 +4,7 @@ Tags: calendar, appointments, scheduling, msp, recurring, office365, syncro
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.4
-Stable tag: 2026.06.3
+Stable tag: 2026.06.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,9 @@ Yes by default. Enable **Settings > Data Management > Delete data on uninstall**
 Use **SmartRecur > Migration Tool** and provide the legacy DB credentials. Customers, services, technicians, and events are copied over.
 
 == Changelog ==
+
+= 2026.06.3.1 =
+* Fatal fix (PHP 8.4): the Services, Technicians and Recurring-Rules REST controllers declared get_items() without the $request parameter that WP_REST_Controller::get_items($request) requires. On PHP 8.4 this incompatible override aborts REST API boot, so every /wp-json/* endpoint returned HTTP 500 (affecting all plugins, not just SmartRecur). Signatures corrected; no behaviour change.
 
 = 2026.06.3 =
 * Booking form rebuilt as a two-column layout with a live "Schedule Builder" — the recurrence preview updates as you change the rule, showing the next occurrences and the human-readable description before you save.

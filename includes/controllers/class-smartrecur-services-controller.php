@@ -88,9 +88,10 @@ final class SmartRecur_Services_Controller extends WP_REST_Controller {
 	/**
 	 * GET /services
 	 *
+	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response
 	 */
-	public function get_items() {
+	public function get_items( $request ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'smartrecur_services';
 		$rows  = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY name ASC", ARRAY_A );
