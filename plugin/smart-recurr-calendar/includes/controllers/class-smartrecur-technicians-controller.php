@@ -69,9 +69,10 @@ final class SmartRecur_Technicians_Controller extends WP_REST_Controller {
 	/**
 	 * GET /technicians
 	 *
+	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response
 	 */
-	public function get_items() {
+	public function get_items( $request ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'smartrecur_technicians';
 		$rows  = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY name ASC", ARRAY_A );

@@ -57,9 +57,10 @@ final class SmartRecur_Recurring_Rules_Controller extends WP_REST_Controller {
 	/**
 	 * GET /recurring-rules
 	 *
+	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response
 	 */
-	public function get_items() {
+	public function get_items( $request ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'smartrecur_recurring_rules';
 		$rows  = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY created_at DESC", ARRAY_A );
